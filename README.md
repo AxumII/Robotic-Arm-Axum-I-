@@ -98,7 +98,7 @@ The design and implementation of the Axum I followed an iterative engineering wo
 
 Before CAD modeling and physical assembly, analytical models were evaluated to determine the physical constraints, structural requirements, and dynamic limits of the robotic arm.
 
-3.1 Torque Analysis & Motor Sizing
+##3.1 Torque Analysis & Motor Sizing
 
 To ensure the actuators can support static and dynamic loads, torque requirements were evaluated at each joint under maximum cantilever conditions (fully extended horizontal pose)
 
