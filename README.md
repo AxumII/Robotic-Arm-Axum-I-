@@ -85,29 +85,34 @@ This repository contains the full design, analysis, embedded code, and experimen
 
 # 1. General Description & Problem Statement
 
-fjiandajndsjakdnasjdnasjdasnkndasdnsadjsandjkasdnsa 
+The **Axum I** is a 4-Degree-of-Freedom (4-DOF) articulated robotic arm developed as a modular platform for trajectory tracking, kinematics evaluation, and embedded control validation. Articulated manipulators face critical challenges regarding structural rigidity, torque distribution across joints, and non-linear dynamic behavior caused by link inertia and joint friction.
+
 ---
 
-## 2. Development Methodology & Flowchart
+# 2. Development Methodology & Flowchart
 
 The design and implementation of the Axum I followed an iterative engineering workflow, moving from analytical calculations to physical validation.
 
+---
 
-
-## 3. Engineering Calculations & Design Constrain
+# 3. Engineering Calculations & Design Constraints
 
 Before CAD modeling and physical assembly, analytical models were evaluated to determine the physical constraints, structural requirements, and dynamic limits of the robotic arm.
 
-##3.1 Torque Analysis & Motor Sizing
+## 3.1 Torque Analysis & Motor Sizing
 
-To ensure the actuators can support static and dynamic loads, torque requirements were evaluated at each joint under maximum cantilever conditions (fully extended horizontal pose)
-
+To ensure the actuators can support both static holding loads and dynamic accelerations, torque requirements were evaluated at each joint under maximum cantilever conditions (fully extended horizontal pose):
 
 $$
-\tau_i = m_i \cdot g \cdot r_i \cdot \cos(\theta)
+\tau_{\text{joint}} = \sum_{i} \left( m_i \cdot g \cdot r_i \cdot \cos(\theta_i) \right) + I_{\text{total}} \cdot \alpha + \tau_{\text{friction}}
 $$
 
 Where:
-* $\tau_i$: Torque at joint $i$.
-* $m_i$: Mass of link $i$.
-* $\theta$: Absolute angle relative to the horizontal plane.
+* $\tau_{\text{joint}}$: Total required torque at the joint axis.
+* $m_i$: Mass of link $i$ and mounted hardware/payload.
+* $g$: Gravitational acceleration ($9.81 \text{ m/s}^2$).
+* $r_i$: Distance from the joint axis to the center of mass of link $i$.
+* $\theta_i$: Absolute angular orientation relative to the horizontal plane ($\cos(0^\circ) = 1$ for worst-case cantilever position).
+* $I_{\text{total}}$: Total moment of inertia referred to the joint rotation axis.
+* $\alpha$: Required angular acceleration ($\ddot{\theta}$).
+* $\tau_{\text{friction}}$: Estimated viscous and Coulomb friction losses in bearings and gearboxes.
