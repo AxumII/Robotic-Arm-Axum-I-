@@ -83,5 +83,17 @@ This repository contains the full design, analysis, embedded code, and experimen
 17. [Conclusions & Future Work](#17-conclusions--future-work)
 
 
+# 1. General Description & Problem Statement
+
+fjiandajndsjakdnasjdnasjdasnkndasdnsadjsandjkasdnsa 
+---
+
+## 2. Development Methodology & Flowchart
+
+The design and implementation of the Axum I followed an iterative engineering workflow, moving from analytical calculations to physical validation.
 
 
+
+3. Engineering Calculations & Design Constrain
+4. 
+Before CAD modeling and physical assembly, analytical models were evaluated to determine the physical constraints, structural requirements, and dynamic limits of the robotic arm.3.1 Torque Analysis & Motor SizingTo ensure the actuators can support static and dynamic loads, torque requirements were evaluated at each joint under maximum cantilever conditions (fully extended horizontal pose):$$\tau_{\text{joint}} = \sum_{i} \left( m_i \cdot g \cdot r_i \right) + I_{\text{total}} \cdot \alpha$$Where:$m_i$: Mass of link $i$ and payload.$r_i$: Distance from the joint axis to the center of mass of link $i$.$g$: Gravitational acceleration ($9.81 \text{ m/s}^2$).$I_{\text{total}}$: Total moment of inertia referred to the joint axis.$\alpha$: Required angular acceleration.
