@@ -116,3 +116,22 @@ Where:
 * $I_{\text{total}}$: Total moment of inertia referred to the joint rotation axis.
 * $\alpha$: Required angular acceleration ($\ddot{\theta}$).
 * $\tau_{\text{friction}}$: Estimated viscous and Coulomb friction losses in bearings and gearboxes.
+
+Para elegir las dimensiones optimas del modelo, se crearon simulaciones en codigo simulando el torque en cualquier pose elegida con la formula anterior, ignorando la friccion viscosa tau debido a que no es posible medirla, se entiende que es significativa. Elcodigo usado, en los anexos se resume en las siguientes formulas. 
+
+Cinemática Directa (Transformaciones Homogéneas): El algoritmo ubica cada articulación, centro de masa y punto final (TCP) en un espacio 3D multiplicando matrices de rotación y traslación. Esto permite calcular las distancias reales sin importar qué tan compleja sea la postura del brazo.Torque mediante Producto Cruz: Para adaptar el modelo al espacio 3D, el cálculo proyectado por el coseno se sustituye por el producto cruz entre el vector de distancia (desde el motor hasta el centro de masa o carga) y el vector de gravedad. Solo se toma la magnitud de la fuerza que actúa directamente sobre el eje de rotación de cada motor.Cálculo de Inercia y Aceleración Límite: El programa calcula el momento de inercia proyectando las masas de forma perpendicular al eje de giro. Al restarle al torque nominal del motor el esfuerzo requerido para sostener el brazo (estático), se obtiene el torque dinámico disponible. Con este remanente, el código despeja la aceleración angular máxima ($\alpha$) que el brazo puede soportar antes de fallar, identificando automáticamente la articulación que funciona como "cuello de botella".
+
+
+## 3.2 Kinematic & Dynamic Constraints
+(Sección vacía - Pendiente por definir)
+
+## 3.3 Structural & Material Resistance
+(Sección vacía - Pendiente por definir)
+
+## 3.4 Bill of Materials (BOM) & Component Selection
+(Sección vacía - Pendiente por definir)
+
+## 3.5 CAD Modeling & Assembly Constraints
+(Sección vacía - Pendiente por definir)
+
+
