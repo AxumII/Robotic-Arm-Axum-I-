@@ -550,82 +550,171 @@ El núcleo del movimiento del robot está gobernado por una arquitectura de **co
 
 ### 1. Lazo Interno: Control de Velocidad (`VelocityLoop`)
 
-Este bucle es el responsable de interactuar directamente con el hardware[cite: 1, 2]. Convierte el error de velocidad en un ciclo de trabajo PWM ($u_{\text{PWM}}$) acotado entre 0 y 100%[cite: 1, 2]. Para lograr un movimiento fluido y preciso, el esfuerzo total no depende de un simple PID, sino de la sumatoria de cuatro modelos matemáticos[cite: 1, 2]:
+Este bucle es el responsable de interactuar directamente con el hardware[cite: 1, 2]. Convierte el error de velocidad en un ciclo de trabajo PWM ($u_{\text{PWM}}$) acotado entre 0 y 100%[cite: 1, 2]. Para lograr un movimiento fluido y preciso, el esfuerzo total no depende de un simple PI, sino de la sumatoria de cuatro modelos matemáticos[cite: 1, 2]:
 
-$$u_{\text{PWM}} = u_{\text{ff}} + u_{\text{PID}} + u_{\text{grav}} + u_{\text{fric}}$$
+$$u_{\text{PWM}} = u_{\text{ff}} + u_{\text{PI}} + u_{\text{grav}} + u_{\text{fric}}$$
 
-*   🚀 **Predictor en Lazo Abierto (Feedforward):** 
-    Reacciona de forma instantánea a la velocidad deseada ($\dot{q}_{\text{ref}}$) sin esperar a que se acumule un error[cite: 1, 2]. Se calcula dinámicamente utilizando la constante de velocidad eléctrica estimada del motor ($K_{v,\text{est}}$)[cite: 1, 2]:    
-$$
-u_{\text{ff}} = \frac{\dot{q}_{\text{ref}}}{K_{v,\text{est}}}
-$$
-    
-*   🎯 **Controlador PI ($u_{\text{PI}}$):** Corrige perturbaciones no modeladas[cite: 1, 2]. Para mitigar errores de discretización a altas frecuencias (400 Hz), implementa una **integración trapezoidal** e incorpora límites estrictos (*Anti-Windup*) a la integral máxima permitida[cite: 1, 2]:
-$$
-u_{\text{PID}} = K_{p,\text{vel}} \cdot e_v + K_{i,\text{vel}} \int e_v \, dt
-$$
-    
-*   ⚖️ **Compensación de Gravedad ($u_{\text{grav}}$):** Inyecta un esfuerzo base constante para evitar que los eslabones colapsen por su propio peso[cite: 1, 2]. Es un modelo no lineal que depende de la configuración absoluta del brazo[cite: 1, 2]:
-$$
-u_{\text{grav, J2}} = k_{\text{grav\_codo}} \cdot \cos(q_1 + q_2)
-$$
-    
-*   🛞 **Compensación de Fricción de Stribeck ($u_{\text{fric}}$):** Modela la asimetría de las cajas reductoras tipo *Worm*[cite: 1, 2]. Considera coeficientes independientes para movimientos a favor y en contra de la gravedad, calculando un decaimiento exponencial desde la fricción estática hacia la de Coulomb cuando el motor rompe la inercia[cite: 1, 2]:
-$$
-F_{\text{stribeck}} = F_c + (F_s - F_c) e^{-\left(\frac{|\dot{q}_{\text{ref}}|}{\omega_s}\right)^2}
-$$
+** Predictor en Lazo Abierto (Feedforward):** 
+Reacciona de forma instantánea a la velocidad deseada ($\dot{q}_{\text{ref}}$) sin esperar a que se acumule un error[cite: 1, 2]. Se calcula dinámicamente utilizando la constante de velocidad estimada del motor ($K_{v,\text{est}}$)[cite: 1, 2]:
+
+$$u_{\text{ff}} = \frac{\dot{q}_{\text{ref}}}{K_{v,\text{est}}}$$
+
+** Controlador PI ($u_{\text{PI}}$):** 
+Corrige perturbaciones no modeladas[cite: 1, 2]. Para mitigar errores de discretización a altas frecuencias (400 Hz), implementa una **integración trapezoidal** e incorpora límites estrictos (*Anti-Windup*) a la integral máxima permitida[cite: 1, 2]:
+
+$$u_{\text{PI}} = K_{p,\text{vel}} \cdot e_v + K_{i,\text{vel}} \int e_v \, dt$$
+
+** Compensación de Gravedad ($u_{\text{grav}}$):** 
+Inyecta un esfuerzo base constante para evitar que los eslabones colapsen por su propio peso[cite: 1, 2]. Es un modelo no lineal que depende de la configuración absoluta del brazo[cite: 1, 2]:
+
+$$u_{\text{grav, J2}} = k_{\text{grav\_codo}} \cdot \cos(q_1 + q_2)$$
+
+** Compensación de Fricción de Stribeck ($u_{\text{fric}}$):** 
+Modela la asimetría de las cajas reductoras tipo *Worm*[cite: 1, 2]. Considera coeficientes independientes para movimientos a favor y en contra de la gravedad, calculando un decaimiento exponencial desde la fricción estática hacia la de Coulomb cuando el motor rompe la inercia[cite: 1, 2]:
+
+$$F_{\text{stribeck}} = F_c + (F_s - F_c) e^{-\left(\frac{|\dot{q}_{\text{ref}}|}{\omega_s}\right)^2}$$
 
 ---
 
 ### 2. Lazos Externos: Generadores de Referencia
 
-Los lazos externos operan a 100 Hz y su única misión es alimentar la variable $\dot{q}_{\text{ref}}$ (velocidad objetivo) del lazo interno[cite: 1, 2]. Dependiendo del tipo de trayectoria exigida, el *firmware* conmuta entre dos estrategias matemáticas[cite: 1, 2]:
+Los lazos externos operan a 100 Hz y su única misión es alimentar la variable $\dot{q}_{\text{ref}}$ (velocidad objetivo) del lazo interno[cite: 1, 2]. Para evitar aceleraciones mecánicas infinitas (tirones), el controlador implementa una **interpolación espaciotemporal** continua[cite: 1]. En lugar de enviar saltos bruscos de posición, el *firmware* normaliza el tiempo de la trayectoria y evalúa perfiles matemáticos de movimiento suave (como polinomios paramétricos de quinto grado o curvas senoidales) para calcular el porcentaje de avance actual y su derivada de velocidad predictiva[cite: 1, 2]. 
+
+Dependiendo del tipo de trayectoria exigida, este avance interpolado alimenta a una de las siguientes dos estrategias matemáticas[cite: 1, 2]:
 
 #### A. Control Cartesiano por Jacobiano Inverso (`PositionLoop`)
-Se activa durante interpolaciones lineales ('C') y circulares ('D') en el espacio Cartesiano de la herramienta[cite: 1, 2]. 
-Primero, calcula una velocidad cartesiana deseada sumando un *feedforward* espacial y un control proporcional del error XYZ[cite: 1, 2]. Luego, traduce esta velocidad espacial a velocidades articulares usando la matriz Jacobiana del manipulador[cite: 1].
+Se activa durante interpolaciones lineales y circulares directamente en el espacio Cartesiano de la herramienta[cite: 1, 2]. Primero, calcula una velocidad cartesiana deseada sumando el *feedforward* espacial (obtenido de la derivada de la interpolación) y un control proporcional del error XYZ[cite: 1, 2]. 
 
-Para dotar al robot de robustez matemática y evitar que los motores se saturen cerca de singularidades cinemáticas, se implementa la inversa de **Mínimos Cuadrados Amortiguados (Damped Least Squares - DLS)**[cite: 1]:
+Luego, traduce esta velocidad espacial a velocidades articulares utilizando la matriz Jacobiana del manipulador[cite: 1]. Para dotar al robot de robustez y evitar solicitudes de velocidad infinitas cerca de singularidades cinemáticas, emplea la inversa de **Mínimos Cuadrados Amortiguados (Damped Least Squares - DLS)**[cite: 1]:
 
-$$J_{\text{DLS}} = J^T (J J^T + \lambda^2 I)^{-1}$$
-$$\dot{q}_{\text{target}} = J_{\text{DLS}} \cdot V_{\text{cartesian}}$$
+$$
+J_{\text{DLS}} = J^T (J J^T + \lambda^2 I)^{-1}
+$$
+
+$$
+\dot{q}_{\text{target}} = J_{\text{DLS}} \cdot V_{\text{cartesian}}
+$$
+
 *(Donde $\lambda^2$ es el factor de amortiguamiento configurado en el firmware)*[cite: 1].
 
+Una característica clave de este lazo es su adaptabilidad matricial. El *firmware* gestiona la orientación de la herramienta conmutando entre tres modos de control (`control_mode`)[cite: 1]:
+*   **Modo Estándar (XYZ puro):** Emplea un Jacobiano de $3 \times 4$ para controlar únicamente la posición en el espacio, dejando la orientación libre[cite: 1].
+*   **Modo con Orientación (Muñeca activa):** Expande la matriz a un Jacobiano cuadrado de $4 \times 4$ añadiendo la restricción del ángulo de cabeceo ($\Phi$). Esto permite mantener la herramienta en un ángulo constante o interpolarlo suavemente respecto al suelo durante el trayecto[cite: 1].
+*   **Modo de Compensación Automática:** Interpola la posición de la muñeca ($\theta_4$) de forma independiente, aplica un control proporcional sobre ella, y resta matemáticamente su efecto del vector de velocidad principal. Luego, resuelve el movimiento de los tres ejes base con un Jacobiano reducido de $3 \times 3$, asegurando que la herramienta mantenga su trayectoria sin desviarse por el giro local de la muñeca[cite: 1].
+
 #### B. Control por Cinemática Inversa Continua (`AngleLoop`)
-Se utiliza para movimientos articulares puros ('Q') o para calcular trayectorias resolviendo la Cinemática Inversa (IK) punto a punto de forma continua ('L', 'O')[cite: 1, 2].
-En este modo, el controlador obtiene un ángulo objetivo absoluto ($q_{\text{ref}}$) a partir de la interpolación de la trayectoria y aplica un control proporcional sobre el error angular actual, sumado a un término de velocidad *feedforward*[cite: 1, 2]:
+Se utiliza para movimientos articulares puros ('Q') o para calcular trayectorias resolviendo la Cinemática Inversa (IK) punto a punto de forma continua ('L', 'O')[cite: 1, 2]. Si durante este cálculo espacial la cinemática detecta que el punto objetivo es físicamente inalcanzable por una singularidad cruzada, el algoritmo aborta la trayectoria automáticamente por seguridad[cite: 1].
 
-$$\dot{q}_{\text{target}} = \dot{q}_{\text{ff}} + K_{p,\text{ang}} \cdot (q_{\text{ref}} - q_{\text{actual}})$$
+En este modo, el controlador obtiene un ángulo objetivo absoluto ($q_{\text{ref}}$) a partir de la interpolación y aplica un control proporcional sobre el error angular actual, sumado a un término de velocidad *feedforward*[cite: 1, 2]:
 
-Esta velocidad resultante es acotada por los límites de seguridad del sistema antes de ser delegada al `VelocityLoop` subyacente[cite: 1].
+$$
+\dot{q}_{\text{target}} = \dot{q}_{\text{ff}} + K_{p,\text{ang}} \cdot (q_{\text{ref}} - q_{\text{actual}})
+$$
+
+Para asegurar una alta precisión terminal, si el error residual es muy pequeño pero el motor no logra romper la fricción estática de la caja reductora, el lazo inyecta un pequeño pulso de velocidad direccional constante (*Joint Boost*) para forzar la entrada del eje a su zona de tolerancia estricta[cite: 1]. 
+
+Esta velocidad resultante es acotada por los límites dinámicos del sistema y validada contra **Muros Virtuales** (que detienen el brazo si se acerca a menos de $1.5^\circ$ de sus límites mecánicos) antes de ser delegada al `VelocityLoop` subyacente para su ejecución[cite: 1].
 
 ## 10.3 Final Model Tuning & Auto-Tuning Strategy
 
-El rendimiento del esquema descrito depende de la correcta parametrización de sus constantes. Debido al desgaste mecánico, estas constantes difieren por articulación y fueron obtenidas empíricamente. Por ejemplo, los valores resultantes (guardados por defecto en el constructor) son[cite: 2]:
+El rendimiento dinámico óptimo de todo el esquema de control depende de la correcta parametrización de sus constantes. Debido a las tolerancias de fabricación y al desgaste mecánico de las cajas reductoras, estos parámetros difieren significativamente en cada articulación[cite: 3, 4].
+
+Por defecto, el constructor del controlador inicializa el sistema con valores empíricos pre-calibrados. Por ejemplo, los parámetros resultantes para los ejes principales son[cite: 3, 4]:
 *   **Base (J0):** $K_p = 20.67$, $K_i = 6.17$, $F_{s,\text{up}} = 23.6\%$, $F_{s,\text{down}} = 15.8\%$
 *   **Hombro (J1):** $K_p = 16.14$, $K_i = 4.82$, $F_{s,\text{up}} = 21.8\%$, $F_{s,\text{down}} = 22.4\%$
 
-Para garantizar que el brazo mantenga este comportamiento tras ser desconectado, el controlador almacena estructuralmente estas ganancias (junto con la fricción) en la Memoria No Volátil (NVS) del ESP32-S3 a través de la función `sys->saveGains()`[cite: 2, 3]. 
+Para garantizar que el brazo mantenga este comportamiento estable tras ser desconectado, el controlador gestiona la persistencia de datos. Mediante la función `setGains()`, se actualizan los parámetros en tiempo de ejecución y se almacenan estructuralmente en la Memoria No Volátil (NVS) del microcontrolador ESP32-S3 a través de la instrucción `_sys->saveGains()`[cite: 3, 4].
 
-Adicionalmente, el sistema expone un modo de calibración automática llamado `AutoTuneLoop`, ejecutado a 200 Hz ($dt = 5 \text{ ms}$)[cite: 2, 3]. Cuando se invoca, esta rutina detiene las operaciones normales del robot e inyecta secuencias de pasos escalón en formato de PWM progresivo, analizando la respuesta de los *encoders* para deducir las zonas muertas de fricción estática y estimar matemáticamente las constantes de tiempo necesarias para sintonizar los parámetros $K_p$ y $K_i$ sin intervención humana.
+#### Rutina de Auto-Sintonización (Auto-Tuning)
+Para adaptar el robot al desgaste a largo plazo sin intervención humana, el *firmware* expone un modo de calibración automática llamado `AutoTuneLoop`[cite: 3, 4]. Sus características operativas son:
+
+*   **Aislamiento y Determinismo:** Cuando se activa la bandera de calibración (`is_tuning`), el orquestador principal detiene las operaciones y trayectorias normales del robot para ceder el control exclusivo a esta rutina, la cual se ejecuta a una frecuencia determinista de **200 Hz** ($dt = 5 \text{ ms}$)[cite: 3, 4].
+*   **Mapeo de Fricción (Zonas Muertas):** El algoritmo inyecta secuencias de pasos escalón en formato de ciclos de trabajo PWM progresivos. Al analizar la retroalimentación directa de los *encoders*, el controlador detecta el punto exacto de ruptura de la inercia, deduciendo así la fricción estática real a favor y en contra de la gravedad ($F_{s,\text{up}}$, $F_{s,\text{down}}$).
+*   **Sintonización PI Autónoma:** Analizando la curva de respuesta temporal frente a los escalones de potencia, el sistema estima matemáticamente las constantes de tiempo de la planta mecánica, calculando de forma automática los parámetros $K_p$ y $K_i$ óptimos para el lazo de velocidad. 
+*   **Aplicación en Caliente:** Al finalizar el ciclo de pruebas, los nuevos parámetros se guardan en la memoria NVS y se aplican inmediatamente, dejando el robot listo para operar con su nueva dinámica[cite: 3, 4].
 
 # 11. Kinematic Modeling
 
-La cinemática dicta la relación geométrica entre los ángulos de las articulaciones (Espacio Articular, $\mathbb{Q}$) y la posición/orientación tridimensional de la herramienta (Espacio Cartesiano, $\mathbb{X}$).
+# 11. Cinemática del Manipulador
 
-## 11.1 Forward Kinematics (FK)
+Este módulo gestiona la transformación matemática entre el espacio articular (ángulos de los motores) y el espacio cartesiano (coordenadas espaciales). Todo el procesamiento matemático pesado se encapsula en la clase `Kinematic`.
 
-La Cinemática Directa halla la posición final ($X, Y, Z$) conociendo los ángulos de los motores ($q_1, q_2, q_3, q_4$)[cite: 2, 3]. El sistema utiliza la función matricial `angle2Pos()` que retorna una matriz de transformación homogénea $T_{4\times4}$[cite: 2]. 
-De forma general, esto se modela multiplicando las matrices de cada eslabón desde la base hasta la herramienta:
+## 11.1 Tabla y Modelo de Denavit-Hartenberg (DH)
 
-$$T_{TCP}^{Base} = A_1(q_1) \cdot A_2(q_2) \cdot A_3(q_3) \cdot A_4(q_4)$$
+Para modelar la cadena cinemática, el *firmware* utiliza la convención clásica de Denavit-Hartenberg. El sistema calcula las matrices de transformación homogénea $4\times4$ individuales para cada eslabón mediante la función `getDH(theta, alpha, d, a)`[cite: 1, 2].
 
-La columna de traslación de esta matriz proporciona el vector de coordenadas actuales $[x, y, z]^T$, fundamental para calcular el error cartesiano en el lazo de control[cite: 2].
+La matriz genérica $A_i$ de DH implementada en el código es la siguiente[cite: 1]:
 
-## 11.2 Inverse Kinematics (IK)
+$$
+A_i = 
+\begin{bmatrix}
+\cos(\theta) & -\cos(\alpha)\sin(\theta) & \sin(\alpha)\sin(\theta) & a\cos(\theta) \\
+\sin(\theta) & \cos(\alpha)\cos(\theta) & -\sin(\alpha)\cos(\theta) & a\sin(\theta) \\
+0 & \sin(\alpha) & \cos(\alpha) & d \\
+0 & 0 & 0 & 1
+\end{bmatrix}
+$$
 
-La Cinemática Inversa resuelve el problema opuesto: dadas las coordenadas deseadas ($X, Y, Z$) y la orientación de cabeceo ($\Phi$), halla los ángulos articulares ($q$)[cite: 3]. El código llama al método analítico `pos2Angle()`[cite: 2, 3]. Este cálculo, al basarse en trigonometría esférica y plana, presenta soluciones múltiples. El *firmware* gestiona esto mediante el booleano `elbowUp` (Codo Arriba/Codo Abajo) para forzar una única solución geométrica[cite: 2, 3]. 
+Según la función `angle2Pos`, los parámetros DH se aplican secuencialmente de la siguiente forma para construir los 4 eslabones[cite: 1, 2]:
+1.  **Motor 0:** $\theta_1$, $\alpha = \frac{\pi}{2}$, $d = l_1$, $a = w_1$[cite: 1]. Produce la matriz `m1`[cite: 1].
+2.  **Motor 1:** $\theta_2$, $\alpha = 0$, $d = w_2$, $a = l_2$[cite: 1]. Produce la matriz `m2`[cite: 1].
+3.  **Motor 2:** $\theta_3$, $\alpha = 0$, $d = w_3$, $a = l_3$[cite: 1]. Produce la matriz `m3`[cite: 1].
+4.  **Motor 3:** $\theta_4$, $\alpha = 0$, $d = w_4$, $a = l_4$[cite: 1]. Produce la matriz `m4`[cite: 1].
 
+## 11.2 Cinemática Directa (Forward Kinematics - FK)
+
+La Cinemática Directa (FK) halla la posición final ($X, Y, Z$) del efector conociendo los ángulos de los 4 motores ($\theta_1, \theta_2, \theta_3, \theta_4$)[cite: 1]. 
+
+El sistema obtiene la pose multiplicando secuencialmente las matrices DH calculadas previamente[cite: 1]:
+
+$$T_{TCP}^{Base} = m_1 \cdot m_2 \cdot m_3 \cdot m_4$$
+
+Esta operación la realiza la función `angle2Pos`, retornando la matriz resultante en `resMatrix`[cite: 1]. De la última columna de esta matriz, el sistema maestro extraerá posteriormente las coordenadas $X, Y, Z$.
+
+## 11.3 Cinemática Inversa (Inverse Kinematics - IK)
+
+La Cinemática Inversa calcula los ángulos articulares requeridos ($\theta_1, \theta_2, \theta_3, \theta_4$) dadas las coordenadas espaciales ($X, Y, Z$)[cite: 1, 2]. El código provee dos implementaciones geométricas analíticas mediante la sobrecarga de la función `pos2Angle()`. Ambas asumen una compensación base en el plano horizontal (offset lateral $W = w_2 + w_3 + w_4$)[cite: 1, 2].
+
+### Cálculo de la Base (Eje 1) para ambos modos
+Independiente del modo, el ángulo de la base ($t_1$) se halla proyectando las coordenadas al plano $XY$[cite: 1]:
+
+1.  Se verifica que el punto no esté dentro de la zona muerta lateral del offset: $r_{xy}^2 = X^2 + Y^2 \geq W^2$[cite: 1].
+2.  El ángulo de la base se calcula considerando la tangente de la posición y el offset lateral:
+    $$t_1 = \arctan\left(\frac{Y}{X}\right) + \arctan\left(\frac{W}{\sqrt{r_{xy}^2 - W^2}}\right)$$[cite: 1]
+
+Tras esto, las coordenadas se proyectan a un marco de referencia cilíndrico relativo, definido por la altura desde la base $l_1$ y el radio planar efectivo $R$[cite: 1]:
+*   $z_{Rel} = Z - l_1$[cite: 1]
+*   $R = X\cos(t_1) + Y\sin(t_1) - w_1$[cite: 1]
+
+### Modo A: Muñeca Libre (Orientación no controlada / 3 DOF)
+En este régimen, se reciben las coordenadas deseadas y un ángulo estático opcional `theta4_in` (normalmente 0)[cite: 1, 2]. Se utiliza cuando la inclinación global de la herramienta no importa.
+
+El algoritmo agrupa matemáticamente el eslabón 3 ($l_3$) y el eslabón 4 ($l_4$) en un único eslabón virtual $L_{virt}$[cite: 1]:
+$$L_{virt} = \sqrt{l_3^2 + l_4^2 + 2l_3 l_4 \cos(\theta_4)}$$[cite: 1]
+
+Con $L_{virt}$ y $l_2$, el sistema aplica la Ley de los Cosenos sobre el triángulo formado para hallar la distancia normalizada $D$[cite: 1]:
+$$D = \frac{R^2 + z_{Rel}^2 - l_2^2 - L_{virt}^2}{2 l_2 L_{virt}}$$[cite: 1]
+
+Finalmente, resolviendo la geometría (donde el signo depende del booleano `elbowUp`)[cite: 1]:
+*   $\gamma = \arctan2(\pm \sqrt{1 - D^2}, D)$[cite: 1]
+*   $\beta = \arctan2(l_4 \sin(\theta_4), l_3 + l_4 \cos(\theta_4))$[cite: 1]
+*   **Articulación 3:** $t_3 = \gamma - \beta$[cite: 1]
+*   **Articulación 2:** $t_2 = \arctan2(z_{Rel}, R) - \arctan2(L_{virt} \sin(\gamma), l_2 + L_{virt} \cos(\gamma))$[cite: 1]
+
+### Modo B: Muñeca Automática (Orientación controlada / 4 DOF)
+En este modo, se recibe un parámetro de inclinación de la herramienta ($\Phi$ o `phi_val`), el cual define el ángulo del efector final relativo al suelo ($t_2 + t_3 + t_4 = \Phi$)[cite: 1].
+
+Aquí, el algoritmo "retrocede" desde el efector final usando $\Phi$ para encontrar la posición de la articulación de la muñeca ($R_j, z_j$)[cite: 1]:
+*   $R_j = R - l_4\cos(\Phi)$[cite: 1]
+*   $z_j = z_{Rel} - l_4\sin(\Phi)$[cite: 1]
+
+Luego, aplica la Ley de los Cosenos solo con $l_2$ y $l_3$ para alcanzar la muñeca[cite: 1]:
+$$D = \frac{R_j^2 + z_j^2 - l_2^2 - l_3^2}{2 l_2 l_3}$$[cite: 1]
+
+Resolviendo los ángulos finales (con el signo dado por `elbowUp`)[cite: 1]:
+*   **Articulación 3:** $t_3 = \arctan2(\pm \sqrt{1 - D^2}, D)$[cite: 1]
+*   **Articulación 2:** $t_2 = \arctan2(z_j, R_j) - \arctan2(l_3 \sin(t_3), l_2 + l_3 \cos(t_3))$[cite: 1]
+*   **Articulación 4:** Despejada de la restricción de orientación: $t_4 = \Phi - (t_2 + t_3)$[cite: 1]
 ---
 
 # 12. Motion Control & Command Reference
@@ -678,3 +767,519 @@ $$X_{\text{ref}}(\tau) = C + R \cdot \cos(\theta \cdot s(\tau)) \cdot \vec{v}_x 
 
 Al igual que en los movimientos lineales, `MovC` resuelve esta ecuación en cada instante utilizando la Cinemática Inversa (IK), mientras que `MovCJc` deriva esta ecuación para inyectar vectores tangenciales de velocidad directamente al controlador Jacobiano DLS[cite: 2, 3].
 
+# 13. Caracterización del Sistema (System Characterization)
+
+Esta sección consolida las especificaciones físicas, eléctricas y operativas del brazo robótico, así como las directrices necesarias para su correcta manipulación y puesta en marcha por parte del usuario final.
+
+## 13.1 Ficha Técnica (Technical Datasheet)
+
+El manipulador robótico ha sido diseñado con las siguientes especificaciones técnicas principales. 
+
+<!-- TABLA PRINCIPAL DEL SISTEMA -->
+<table>
+  <thead>
+    <tr>
+      <th colspan="4" style="background-color: #FF8C00; color: white; text-align: left; font-size: 16px;">ABSOLUTE MAXIMUM RATINGS / SYSTEM DATASHEET</th>
+    </tr>
+    <tr>
+      <th style="background-color: #f2f2f2; text-align: left; width: 40%;">PARÁMETRO</th>
+      <th style="background-color: #f2f2f2; text-align: center; width: 25%;">ESPECIFICACIÓN</th>
+      <th style="background-color: #f2f2f2; text-align: center; width: 15%;">UNIDAD</th>
+      <th style="background-color: #f2f2f2; text-align: center; width: 20%;">RESOLUCIÓN</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Grados de Libertad (DOF)</strong></td>
+      <td align="center">4</td>
+      <td align="center">-</td>
+      <td align="center">-</td>
+    </tr>
+    <tr>
+      <td><strong>Carga Útil Máxima (Payload)</strong></td>
+      <td align="center">150</td>
+      <td align="center">g</td>
+      <td align="center">-</td>
+    </tr>
+    <tr>
+      <td><strong>Alcance Máximo Radial (Reach)</strong></td>
+      <td align="center">630.03</td>
+      <td align="center">mm</td>
+      <td align="center">-</td>
+    </tr>
+    <tr>
+      <td><strong>Alimentación Eléctrica Lógica</strong></td>
+      <td align="center">3.3</td>
+      <td align="center">V DC</td>
+      <td align="center">-</td>
+    </tr>
+    <tr>
+      <td><strong>Motor JGY 370</strong></td>
+      <td align="center">12</td>
+      <td align="center">V DC</td>
+      <td align="center">12.5 A Máx.</td>
+    </tr>
+    <tr>
+      <td><strong>Motor 5840 31ZY</strong></td>
+      <td align="center">12</td>
+      <td align="center">V DC</td>
+      <td align="center">12.5 A Máx.</td>
+    </tr>
+    <tr>
+      <td><strong>Encoder Cuadratura Hall JGY</strong></td>
+      <td align="center">16</td>
+      <td align="center">CPR</td>
+      <td align="center"></td>
+    </tr>
+     <td><strong>Encoder Cuadratura Hall 31ZY</strong></td>
+      <td align="center">5</td>
+      <td align="center">CPR</td>
+      <td align="center"></td>
+    </tr>
+    <tr>
+      <td><strong>Controlador Principal</strong></td>
+      <td align="center">ESP32</td>
+      <td align="center">S3</td>
+      <td align="center">N16R(</td>
+    </tr>
+    <tr>
+      <td><strong>Frecuencia de Control (Lazo PID)</strong></td>
+      <td align="center">100 / 400</td>
+      <td align="center">Hz</td>
+      <td align="center">$\Delta t$: 10ms / 2.5ms</td>
+    </tr>
+    <tr>
+      <td><strong>Peso Total del Sistema</strong></td>
+      <td align="center">1.4</td>
+      <td align="center">kg</td>
+      <td align="center"></td>
+    </tr>
+  </tbody>
+</table>
+
+<br>
+
+<!-- TABLA: ELECTROIMÁN 1 (HORIZONTAL) -->
+<table>
+  <thead>
+    <tr>
+      <th colspan="4" style="background-color: #FF8C00; color: white; text-align: left; font-size: 16px;">END-EFFECTOR DATASHEET: ELECTROIMÁN HORIZONTAL</th>
+    </tr>
+    <tr>
+      <th style="background-color: #f2f2f2; text-align: left; width: 40%;">PARÁMETRO</th>
+      <th style="background-color: #f2f2f2; text-align: center; width: 25%;">ESPECIFICACIÓN</th>
+      <th style="background-color: #f2f2f2; text-align: center; width: 15%;">UNIDAD</th>
+      <th style="background-color: #f2f2f2; text-align: center; width: 20%;">RESOLUCIÓN</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Voltaje de Operación Nominal</strong></td>
+      <td align="center">12</td>
+      <td align="center">V DC</td>
+      <td align="center">-</td>
+    </tr>
+    <tr>
+      <td><strong>Consumo de Corriente Máximo</strong></td>
+      <td align="center">300</td>
+      <td align="center">mA</td>
+      <td align="center">-</td>
+    </tr>
+    <tr>
+      <td><strong>Fuerza de Sujeción</strong></td>
+      <td align="center">4.905</td>
+      <td align="center">N</td>
+      <td align="center">~</td>
+    </tr>
+    <tr>
+      <td><strong>Peso de la Herramienta</strong></td>
+      <td align="center">60</td>
+      <td align="center">g</td>
+      <td align="center"></td>
+    </tr>
+         <tr>
+      <td><strong>Longitud Total)</strong></td>
+      <td align="center">60 tcp/80</td>
+      <td align="center">mm</td>
+      <td align="center"></td>
+    </tr>
+  </tbody>
+</table>
+
+<br>
+
+<!-- TABLA: ELECTROIMÁN 2 (VERTICAL) -->
+<table>
+  <thead>
+    <tr>
+      <th colspan="4" style="background-color: #FF8C00; color: white; text-align: left; font-size: 16px;">END-EFFECTOR DATASHEET: ELECTROIMÁN VERTICAL</th>
+    </tr>
+    <tr>
+      <th style="background-color: #f2f2f2; text-align: left; width: 40%;">PARÁMETRO</th>
+      <th style="background-color: #f2f2f2; text-align: center; width: 25%;">ESPECIFICACIÓN</th>
+      <th style="background-color: #f2f2f2; text-align: center; width: 15%;">UNIDAD</th>
+      <th style="background-color: #f2f2f2; text-align: center; width: 20%;">RESOLUCIÓN</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Voltaje de Operación Nominal</strong></td>
+      <td align="center">[Valor]</td>
+      <td align="center">V DC</td>
+      <td align="center">-</td>
+    </tr>
+    <tr>
+      <td><strong>Consumo de Corriente Máximo</strong></td>
+      <td align="center">300</td>
+      <td align="center">mA</td>
+      <td align="center">-</td>
+    </tr>
+    <tr>
+      <td><strong>Fuerza de Sujeción</strong></td>
+      <td align="center">4.905</td>
+      <td align="center">N</td>
+      <td align="center">-</td>
+    </tr>
+    <tr>
+      <td><strong>Peso de la Herramienta</strong></td>
+      <td align="center">55</td>
+      <td align="center">g</td>
+      <td align="center"></td>
+    </tr>
+    <tr>
+      <td><strong>Longitud Total)</strong></td>
+      <td align="center">60</td>
+      <td align="center">mm</td>
+      <td align="center"></td>
+    </tr>
+  </tbody>
+</table>
+
+<br>
+
+<!-- TABLA: GRIPPER -->
+<table>
+  <thead>
+    <tr>
+      <th colspan="4" style="background-color: #FF8C00; color: white; text-align: left; font-size: 16px;">END-EFFECTOR DATASHEET: GRIPPER (PINZA)</th>
+    </tr>
+    <tr>
+      <th style="background-color: #f2f2f2; text-align: left; width: 40%;">PARÁMETRO</th>
+      <th style="background-color: #f2f2f2; text-align: center; width: 25%;">ESPECIFICACIÓN</th>
+      <th style="background-color: #f2f2f2; text-align: center; width: 15%;">UNIDAD</th>
+      <th style="background-color: #f2f2f2; text-align: center; width: 20%;">RESOLUCIÓN</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Voltaje de Operación</strong></td>
+      <td align="center">12</td>
+      <td align="center">V DC</td>
+      <td align="center">-</td>
+    </tr>
+    <tr>
+      <td><strong>Apertura Máxima de Mandíbulas</strong></td>
+      <td align="center">70</td>
+      <td align="center">mm</td>
+      <td align="center">-</td>
+    </tr>
+    <tr>
+      <td><strong>Fuerza de Agarre (Aprox)</strong></td>
+      <td align="center">3</td>
+      <td align="center">N</td>
+      <td align="center">-</td>
+    </tr>
+    <tr>
+      <td><strong>Peso de la Herramienta</strong></td>
+      <td align="center">220</td>
+      <td align="center">g</td>
+      <td align="center">Con motor incluido</td>
+    </tr>
+    <tr>
+      <td><strong>Longitud Total)</strong></td>
+      <td align="center">105 / 130</td>
+      <td align="center">mm</td>
+      <td align="center"></td>
+    </tr>
+  </tbody>
+</table>
+
+<br>
+
+<!-- TABLA: PUNTA DE CALIBRACIÓN -->
+<table>
+  <thead>
+    <tr>
+      <th colspan="4" style="background-color: #FF8C00; color: white; text-align: left; font-size: 16px;">END-EFFECTOR DATASHEET: PUNTA DE CALIBRACIÓN</th>
+    </tr>
+    <tr>
+      <th style="background-color: #f2f2f2; text-align: left; width: 40%;">PARÁMETRO</th>
+      <th style="background-color: #f2f2f2; text-align: center; width: 25%;">ESPECIFICACIÓN</th>
+      <th style="background-color: #f2f2f2; text-align: center; width: 15%;">UNIDAD</th>
+      <th style="background-color: #f2f2f2; text-align: center; width: 20%;">RESOLUCIÓN</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Longitud Total)</strong></td>
+      <td align="center">24</td>
+      <td align="center">mm</td>
+      <td align="center">Medido en Eje Z TCP</td>
+    </tr>
+    <tr>
+      <td><strong>Peso de la Herramienta</strong></td>
+      <td align="center">5</td>
+      <td align="center">g</td>
+      <td align="center">-</td>
+    </tr>
+  </tbody>
+</table>
+
+## 13.2 Instruction Manual
+# Manual de Referencia Técnica - Instrucciones, funciones y tipos de datos
+
+---
+**RobotWare Base / ControlManager**
+**Revisión: 1.0**
+
+---
+
+# 1 Instrucciones de Movimiento (mov)
+
+Este documento detalla las instrucciones de movimiento implementadas en el sistema `ControlManager` para el control de trayectorias articulares y cartesianas del robot [cite: 1, 2].
+
+---
+
+## 1.1 `movA` - Mueve el robot en el espacio articular
+*ControlManager Base*
+
+---
+### Utilización
+`movA` se utiliza para trasladar los ejes del robot de forma síncrona hacia una posición articular de destino especificada en radianes [cite: 1]. Durante el movimiento, no se garantiza una trayectoria en línea recta del punto central de la herramienta (TCP). La duración de la trayectoria se calcula automáticamente basándose en la diferencia de posición máxima y la velocidad angular configurada [cite: 1].
+
+### Ejemplos básicos
+**Ejemplo 1**
+```cpp
+robot.movA(0.0, 1.57, -1.57, 0.0, 20.0);
+```
+El TCP de la herramienta, se mueve hacia la posición articular de destino con una velocidad máxima de `20.0` grados/segundo.
+
+---
+### Argumentos
+`movA(q1, q2, q3, q4, speed_deg_s)`
+
+<dl>
+  <dt><code>q1, q2, q3, q4</code></dt>
+  <dd>
+    <em>Tipo de dato:</em> <code>float</code><br>
+    Posición de destino absoluta para cada una de las 4 articulaciones (en radianes). El sistema verifica automáticamente que estos valores se encuentren dentro de los límites físicos configurados (<code>_min_angles</code> y <code>_max_angles</code>) [cite: 1, 2].
+  </dd>
+
+  <dt><code>speed_deg_s</code></dt>
+  <dd>
+    <em>Tipo de dato:</em> <code>float</code><br>
+    Velocidad máxima angular solicitada en grados por segundo [cite: 1]. Se limita internamente entre <code>0.05 rad/s</code> y <code>_max_vel_rad</code> (30°/s) por seguridad [cite: 1].
+  </dd>
+</dl>
+
+> ℹ️ **Nota de Seguridad**
+> Si alguna de las coordenadas articulares excede las paredes virtuales, la trayectoria no se iniciará o será abortada automáticamente [cite: 1].
+
+---
+<br>
+
+## 1.2 `movJ` - Mueve el robot a una posición cartesiana (Articular Pura)
+*ControlManager Base*
+
+---
+### Utilización
+`movJ` traslada el TCP a una coordenada cartesiana de destino (X, Y, Z). Calcula los ángulos articulares requeridos mediante Cinemática Inversa (IK) solo al inicio y luego interpola de forma articular (no lineal en el espacio cartesiano) [cite: 1]. Es ideal para movimientos rápidos donde la trayectoria exacta del TCP no es crítica.
+
+---
+### Argumentos
+`movJ(x, y, z, speed_mm_s, [phi_val], [elbowUp])`
+
+<dl>
+  <dt><code>x, y, z</code></dt>
+  <dd>
+    <em>Tipo de dato:</em> <code>float</code><br>
+    Coordenadas de destino del TCP en milímetros [cite: 1].
+  </dd>
+
+  <dt><code>speed_mm_s</code></dt>
+  <dd>
+    <em>Tipo de dato:</em> <code>float</code><br>
+    Velocidad lineal deseada del TCP en milímetros por segundo [cite: 1].
+  </dd>
+
+  <dt><code>[phi_val]</code> (Opcional)</dt>
+  <dd>
+    <em>Tipo de dato:</em> <code>float</code><br>
+    Ángulo de orientación final deseado del actuador en radianes [cite: 1, 2].
+  </dd>
+
+  <dt><code>[elbowUp]</code> (Opcional, por defecto <code>true</code>)</dt>
+  <dd>
+    <em>Tipo de dato:</em> <code>bool</code><br>
+    Selecciona la configuración cinemática (codo arriba / codo abajo) para resolver las múltiples soluciones de la cinemática inversa [cite: 1, 2].
+  </dd>
+</dl>
+
+---
+<br>
+
+## 1.3 `movL` / `movLJc` - Mueve el robot linealmente
+*Trayectorias Cartesianas*
+
+---
+### Utilización
+Estas instrucciones trasladan el TCP en línea recta desde la posición actual hacia el destino.
+*   **`movL`**: Utiliza Cinemática Inversa (IK) Continua durante toda la trayectoria interpolada. Si el robot cruza una singularidad matemática, el movimiento se aborta [cite: 1].
+*   **`movLJc`**: Utiliza control Jacobiano DLS (Damped Least Squares) para calcular las velocidades articulares [cite: 1]. Proporciona una mejor estabilidad cerca de las singularidades, introduciendo un factor de amortiguamiento `lambda_sq = 0.01f` [cite: 1].
+
+### Ejemplos básicos
+**Ejemplo 1**
+```cpp
+// Movimiento lineal estricto IK
+robot.movL(150.0, 50.0, 100.0, 25.0); 
+
+// Movimiento lineal por Jacobiano DLS con orientación específica
+robot.movLJc(150.0, 50.0, 100.0, 25.0, 1.57);
+```
+
+---
+### Argumentos
+`movL(x, y, z, speed_mm_s, [phi_rad], [elbowUp])`
+`movLJc(x, y, z, speed_mm_s, [phi_rad])`
+
+<dl>
+  <dt><code>speed_mm_s</code></dt>
+  <dd>
+    Velocidad lineal de traslación del TCP. Se asume como un parámetro de velocidad constante.
+  </dd>
+
+  <dt><code>phi_rad</code></dt>
+  <dd>
+    Especifica la orientación final. <code>movLJc</code> calculará una matriz Jacobiana de 4x4 o 3x4 dependiendo de si se requiere controlar el ángulo <code>phi</code> (<code>control_mode = 1</code>) o solo la posición [cite: 1, 2].
+  </dd>
+</dl>
+
+---
+<br>
+
+## 1.4 `movC` / `movCJc` - Mueve el robot en círculo
+*Trayectorias Cartesianas*
+
+---
+### Utilización
+Se utilizan para trasladar el TCP a través de un recorrido circular. El círculo se define a partir de la posición inicial actual, un punto de paso o de vía (`via`) y el punto de destino (`end`) [cite: 1, 2].
+Al igual que en movimientos lineales, `movC` emplea IK continua [cite: 1], mientras que `movCJc` emplea el integrador Jacobiano DLS [cite: 1].
+
+### Ejecución de programas
+El radio, el centroide, y los vectores directores (`circ_vx`, `circ_vy`) se calculan resolviendo la intersección normalizada de los vectores generados por los tres puntos. Si los puntos son colineales (`normN2 < 1e-6f`), la instrucción retornará `false` evitando un error matemático [cite: 1]. 
+La rotación total (`circ_total_angle`) puede alcanzar hasta `2.0 * M_PI` radianes [cite: 1].
+
+### Ejemplos básicos
+**Ejemplo 1**
+```cpp
+// Se desplaza en círculo pasando por (100, 50, 100) hasta (50, 0, 100)
+robot.movC(100.0, 50.0, 100.0, 50.0, 0.0, 100.0, 30.0);
+```
+
+---
+### Argumentos
+`movC(x_via, y_via, z_via, x_end, y_end, z_end, speed_mm_s, [phi_rad], [elbowUp])`
+
+<dl>
+  <dt><code>x_via, y_via, z_via</code></dt>
+  <dd>
+    <em>Tipo de dato:</em> <code>float</code><br>
+    El punto de paso (vía) en milímetros que define la curvatura del círculo [cite: 1, 2].
+  </dd>
+
+  <dt><code>x_end, y_end, z_end</code></dt>
+  <dd>
+    <em>Tipo de dato:</em> <code>float</code><br>
+    El punto de destino final del arco o círculo [cite: 1, 2].
+  </dd>
+</dl>
+
+> ℹ️ **Nota de Interpolación**
+> La interpolación por defecto durante la ejecución se rige mediante polinomios. El perfil activo se define internamente por la variable `traj_profile` [cite: 2], que puede ser 's' (senoidal), 'c' (cúbico), o 'i' (quintico) [cite: 1].
+
+---
+<br>
+
+## 1.5 `movZ` / `movZJc` - Movimiento Vertical Exclusivo
+*Trayectorias Especiales*
+
+---
+### Utilización
+Ejecuta un movimiento rectilíneo modificando únicamente la coordenada Z, manteniendo constantes las posiciones X e Y actuales extraídas mediante Cinemática Directa de los sensores [cite: 1].
+
+---
+### Argumentos
+`movZ(z, speed_mm_s, phi_rad)`
+
+<dl>
+  <dt><code>z</code></dt>
+  <dd>
+    Nueva cota Z en milímetros [cite: 2].
+  </dd>
+</dl>
+Las posiciones X e Y se heredan de `_kinematic->angle2Pos(sensor_q)` [cite: 1].
+---
+
+# 14. Evaluación de Rendimiento y Pruebas Experimentales (Performance Evaluation & Experimental Tests)
+
+Para validar el desempeño del diseño de control y las formulaciones cinemáticas implementadas, se llevaron a cabo diversas pruebas experimentales. Se analizó la precisión de posicionamiento y el comportamiento dinámico del robot bajo distintas estrategias de control y perfiles de trayectoria.
+
+## 14.1 Rendimiento de Posicionamiento Angular (Angular Positioning Performance)
+
+Se evaluó la capacidad del controlador PID en cascada para alcanzar y mantener referencias articulares estáticas. Se enviaron comandos de paso (*step*) a cada articulación ($q_0, q_1, q_2, q_3$) y se registró la respuesta transitoria y el error en estado estable. 
+
+* *(Insertar aquí descripción de la respuesta: tiempo de asentamiento, sobreimpulso, y el error estático residual medio en grados).*
+* *(Añadir referencia a una gráfica de respuesta al escalón articular).*
+
+## 14.2 Trayectoria de Movimiento en el Espacio Libre (Free-Space Motion Trajectory)
+
+Esta prueba evaluó los movimientos de tipo Point-to-Point (PTP) utilizando interpolación articular pura (movimientos asíncronos u homólogos). Se verificó que el sistema generara perfiles de velocidad suaves (trapezoidales o curva-S) sin saturar los actuadores, garantizando un desplazamiento fluido entre posiciones distantes del espacio de trabajo sin seguir una ruta cartesiana estricta.
+
+* *(Insertar observaciones empíricas sobre la fluidez del movimiento y la sincronización de las articulaciones para llegar al mismo tiempo al objetivo).*
+
+## 14.3 Precisión en el Seguimiento de Línea (Line-Following Accuracy)
+
+Se programó el efector final para trazar una trayectoria rectilínea entre un punto $A$ y un punto $B$ en el espacio tridimensional. El objetivo es evaluar la desviación cartesiana del efector respecto a la línea ideal.
+
+### 14.3.1 Control en el Espacio Articular (Joint-Space Control)
+La línea fue discretizada en múltiples puntos (*via-points*) calculados con cinemática inversa estática. Entre cada punto, las articulaciones se movieron mediante interpolación articular.
+* *(Describir observaciones: ej. vibraciones introducidas por la discretización o variaciones en la velocidad tangencial).*
+
+### 14.3.2 Control Diferencial Jacobiano (Jacobian Differential Control)
+Se ejecutó la misma recta implementando el método de la matriz Jacobiana pseudo-inversa amortiguada (DLS). El vector de velocidad cartesiana se tradujo continuamente en velocidades articulares.
+* *(Describir observaciones: ej. mayor fluidez en la trayectoria, constancia en la velocidad lineal, manejo de proximidad a singularidades).*
+
+### 14.3.3 Análisis de Error y Comparación (Error Analysis & Comparison)
+* *(Insertar tabla o métricas comparativas: Error Cuadrático Medio (RMSE) y Desviación Máxima Absoluta para ambos métodos).* 
+* **Conclusión de la prueba:** El control diferencial demostró ser [más/menos] preciso y [más/menos] estable computacionalmente que el control discreto articular para tareas de desplazamiento lineal cartesiano.
+
+## 14.4 Precisión en el Seguimiento de Círculos (Circle-Following Accuracy)
+
+El manipulador fue comandado para dibujar un círculo en el plano tridimensional, definido por un punto inicial, un punto de paso (*via-point*) y un punto final, evaluando el error de contorno.
+
+### 14.4.1 Control en el Espacio Articular (Joint-Space Control)
+La trayectoria circular fue subdividida algorítmicamente en pequeños segmentos lineales/angulares resolviendo la cinemática inversa analítica en cada instante de muestreo.
+
+### 14.4.2 Control Diferencial Jacobiano (Jacobian Differential Control)
+Las velocidades cartesianas tangenciales y normales del círculo fueron proyectadas directamente a los motores utilizando la matriz Jacobiana del manipulador. 
+
+### 14.4.3 Análisis de Error y Comparación (Error Analysis & Comparison)
+* *(Insertar aquí las métricas de desviación radial y deformación geométrica, así como la gráfica comparativa del círculo ideal vs. el círculo real trazado).*
+* **Conclusión de la prueba:** Se evidenció que el control Jacobiano reduce la deformación de la trayectoria circular (el efecto de "polígono") en comparación con la interpolación de puntos en el espacio articular, logrando un mejor desempeño especialmente a velocidades elevadas.
+
+## 14.5 Validación de Pick-and-Place (Pick-and-Place Validation)
+
+Para probar la aplicabilidad del robot en tareas industriales estándar, se diseñó una rutina continua de manipulación de objetos utilizando un actuador electromagnético, midiendo la repetibilidad y el control de orientación de la herramienta.
+
+### 14.5.1 Ejecución con Electroimán Vertical (Vertical Electromagnet Execution)
+Se requirió que el robot tomara una pieza de una pared vertical y la depositara en otra superficie ortogonal. Para ello, se activó el modo "Muñeca Forzada" (3 DOF), forzando una restricción de cabeceo (*Pitch* constante, $\Phi$). La prueba demostró que el controlador cinemático logró mantener la orientación del efector estricta durante toda la traslación cartesiana, evitando la caída de la pieza magnética y asegurando una aproximación precisa a la superficie objetivo.
