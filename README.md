@@ -539,35 +539,65 @@ $$P = (I - K \cdot H) \cdot P_{\text{pred}}$$
 
 ## 10.2 Firmware Control Loop Implementation
 
-La función orquestadora `CascadeControl()` administra los tiempos de ejecución de los lazos de control para asegurar un determinismo en tiempo real. El lazo cartesiano externo opera a 100 Hz ($dt = 10 \text{ ms}$), mientras que el lazo interno de velocidad se ejecuta a 400 Hz ($dt = 2.5 \text{ ms}$) para garantizar una alta rigidez dinámica en los actuadores[cite: 2].
+## ⚙️ Arquitectura de Control en Cascada (Firmware Control Loop)
 
-**Lazo Interno: Control de Velocidad a PWM (`VelocityLoop`)**
-Este bucle de control convierte el error de velocidad en un ciclo de trabajo PWM ($u_{\text{PWM}}$) acotado entre $0$ y $100\%$. El esfuerzo total no es un simple PID, sino una sumatoria de cuatro modelos matemáticos distintos[cite: 2]:
+El núcleo del movimiento del robot está gobernado por una arquitectura de **control en cascada multitasas**, orquestada por la función `CascadeControl()`[cite: 1, 2]. Este diseño garantiza el determinismo en tiempo real y una alta rigidez dinámica al separar las responsabilidades matemáticas y físicas en dos frecuencias de ejecución distintas[cite: 1, 2]:
+
+1. **Lazos Externos (Cinemática y Trayectorias):** Se ejecutan a **100 Hz** ($dt = 10 \text{ ms}$) y calculan las velocidades objetivo de cada articulación basándose en el error de posición[cite: 1, 2].
+2. **Lazo Interno (Dinámica y Esfuerzo):** Se ejecuta a **400 Hz** ($dt = 2.5 \text{ ms}$) y se encarga de que los motores alcancen físicamente las velocidades exigidas por los lazos externos[cite: 1, 2].
+
+---
+
+### 1. Lazo Interno: Control de Velocidad (`VelocityLoop`)
+
+Este bucle es el responsable de interactuar directamente con el hardware[cite: 1, 2]. Convierte el error de velocidad en un ciclo de trabajo PWM ($u_{\text{PWM}}$) acotado entre 0 y 100%[cite: 1, 2]. Para lograr un movimiento fluido y preciso, el esfuerzo total no depende de un simple PID, sino de la sumatoria de cuatro modelos matemáticos[cite: 1, 2]:
 
 $$u_{\text{PWM}} = u_{\text{ff}} + u_{\text{PID}} + u_{\text{grav}} + u_{\text{fric}}$$
 
-**1. Predictor en Lazo Abierto (Feedforward, $u_{\text{ff}}$):**
-Reacciona inmediatamente a la velocidad deseada ($\dot{q}_{\text{ref}}$) sin esperar a que se acumule un error de seguimiento. Utiliza una constante de velocidad eléctrica estimada ($K_{v,\text{est}}$)[cite: 2]:
-$$u_{\text{ff}} = \frac{\dot{q}_{\text{ref}}}{K_{v,\text{est}}}$$
-El *firmware* calcula dinámicamente este parámetro relacionando la constante de tiempo mecánica ($\tau_{\text{mec}} = 0.15$) y la constante de lazo cerrado ($\tau_c = 0.80$) con la ganancia proporcional[cite: 2].
+*   🚀 **Predictor en Lazo Abierto (Feedforward):** 
+    Reacciona de forma instantánea a la velocidad deseada ($\dot{q}_{\text{ref}}$) sin esperar a que se acumule un error[cite: 1, 2]. Se calcula dinámicamente utilizando la constante de velocidad eléctrica estimada del motor ($K_{v,\text{est}}$)[cite: 1, 2]:    
+$$
+u_{\text{ff}} = \frac{\dot{q}_{\text{ref}}}{K_{v,\text{est}}}
+$$
+    
+*   🎯 **Controlador PI ($u_{\text{PI}}$):** Corrige perturbaciones no modeladas[cite: 1, 2]. Para mitigar errores de discretización a altas frecuencias (400 Hz), implementa una **integración trapezoidal** e incorpora límites estrictos (*Anti-Windup*) a la integral máxima permitida[cite: 1, 2]:
+$$
+u_{\text{PID}} = K_{p,\text{vel}} \cdot e_v + K_{i,\text{vel}} \int e_v \, dt
+$$
+    
+*   ⚖️ **Compensación de Gravedad ($u_{\text{grav}}$):** Inyecta un esfuerzo base constante para evitar que los eslabones colapsen por su propio peso[cite: 1, 2]. Es un modelo no lineal que depende de la configuración absoluta del brazo[cite: 1, 2]:
+$$
+u_{\text{grav, J2}} = k_{\text{grav\_codo}} \cdot \cos(q_1 + q_2)
+$$
+    
+*   🛞 **Compensación de Fricción de Stribeck ($u_{\text{fric}}$):** Modela la asimetría de las cajas reductoras tipo *Worm*[cite: 1, 2]. Considera coeficientes independientes para movimientos a favor y en contra de la gravedad, calculando un decaimiento exponencial desde la fricción estática hacia la de Coulomb cuando el motor rompe la inercia[cite: 1, 2]:
+$$
+F_{\text{stribeck}} = F_c + (F_s - F_c) e^{-\left(\frac{|\dot{q}_{\text{ref}}|}{\omega_s}\right)^2}
+$$
 
-**2. Controlador Proporcional-Integral ($u_{\text{PID}}$):**
-Corrige las perturbaciones no modeladas. Para mitigar errores de discretización en el término integral a altas frecuencias (400 Hz), se emplea una **integración trapezoidal** en lugar de la rectangular estándar de Euler[cite: 2]:
-$$u_{\text{PID}} = K_{p,\text{vel}} \cdot e_v + K_{i,\text{vel}} \int e_v \, dt \quad \text{donde} \quad e_v = \dot{q}_{\text{ref}} - \dot{q}_{\text{est}}$$
-Para evitar el colapso del puente H por saturación (*Windup*), la integral se recorta estrictamente a un valor máximo de seguridad (`_max_int_pwm = 80.0f`)[cite: 2].
+---
 
-**3. Compensación de Gravedad ($u_{\text{grav}}$):**
-Inyecta un esfuerzo base para sostener los eslabones suspendidos y evitar su colapso por peso propio. El par necesario es no lineal, dependiendo del coseno del ángulo absoluto de cada eslabón respecto a la horizontal. Las constantes $k_{\text{grav}}$ fueron deducidas analíticamente de las masas y centros de masa de la estructura[cite: 2, 3]:
-$$u_{\text{grav, J1}} = k_{\text{grav\_hombro}} \cdot \cos(q_1)$$
-$$u_{\text{grav, J2}} = k_{\text{grav\_codo}} \cdot \cos(q_1 + q_2)$$
-$$u_{\text{grav, J3}} = k_{\text{grav\_mun}} \cdot \cos(q_1 + q_2 + q_3)$$
-Para evitar sacudidas mecánicas al inicio del movimiento, el *firmware* multiplica esta componente por una función lineal suavizadora dependiente de la velocidad de referencia (`suavizador`)[cite: 2].
+### 2. Lazos Externos: Generadores de Referencia
 
-**4. Compensación de Fricción de Stribeck ($u_{\text{fric}}$):**
-Las cajas reductoras tipo *Worm* presentan una fricción estática altamente asimétrica. El código modela coeficientes independientes para el movimiento a favor y en contra de la gravedad ($F_{s,\text{up}}$ y $F_{s,\text{down}}$)[cite: 2, 3]. Cuando el motor rompe la inercia, la fricción decae exponencialmente hacia la fricción de Coulomb ($F_c = 0.75 F_s$)[cite: 2]:
-$$F_{\text{stribeck}} = F_c + (F_s - F_c) e^{-\left(\frac{|\dot{q}_{\text{ref}}|}{\omega_s}\right)^2}$$
-$$u_{\text{fric}} = F_{\text{stribeck}} \cdot \text{sgn}(\dot{q}_{\text{ref}})$$
-Donde $\omega_s = 0.15 \text{ rad/s}$ es la velocidad de transición de Stribeck calibrada experimentalmente[cite: 2].
+Los lazos externos operan a 100 Hz y su única misión es alimentar la variable $\dot{q}_{\text{ref}}$ (velocidad objetivo) del lazo interno[cite: 1, 2]. Dependiendo del tipo de trayectoria exigida, el *firmware* conmuta entre dos estrategias matemáticas[cite: 1, 2]:
+
+#### A. Control Cartesiano por Jacobiano Inverso (`PositionLoop`)
+Se activa durante interpolaciones lineales ('C') y circulares ('D') en el espacio Cartesiano de la herramienta[cite: 1, 2]. 
+Primero, calcula una velocidad cartesiana deseada sumando un *feedforward* espacial y un control proporcional del error XYZ[cite: 1, 2]. Luego, traduce esta velocidad espacial a velocidades articulares usando la matriz Jacobiana del manipulador[cite: 1].
+
+Para dotar al robot de robustez matemática y evitar que los motores se saturen cerca de singularidades cinemáticas, se implementa la inversa de **Mínimos Cuadrados Amortiguados (Damped Least Squares - DLS)**[cite: 1]:
+
+$$J_{\text{DLS}} = J^T (J J^T + \lambda^2 I)^{-1}$$
+$$\dot{q}_{\text{target}} = J_{\text{DLS}} \cdot V_{\text{cartesian}}$$
+*(Donde $\lambda^2$ es el factor de amortiguamiento configurado en el firmware)*[cite: 1].
+
+#### B. Control por Cinemática Inversa Continua (`AngleLoop`)
+Se utiliza para movimientos articulares puros ('Q') o para calcular trayectorias resolviendo la Cinemática Inversa (IK) punto a punto de forma continua ('L', 'O')[cite: 1, 2].
+En este modo, el controlador obtiene un ángulo objetivo absoluto ($q_{\text{ref}}$) a partir de la interpolación de la trayectoria y aplica un control proporcional sobre el error angular actual, sumado a un término de velocidad *feedforward*[cite: 1, 2]:
+
+$$\dot{q}_{\text{target}} = \dot{q}_{\text{ff}} + K_{p,\text{ang}} \cdot (q_{\text{ref}} - q_{\text{actual}})$$
+
+Esta velocidad resultante es acotada por los límites de seguridad del sistema antes de ser delegada al `VelocityLoop` subyacente[cite: 1].
 
 ## 10.3 Final Model Tuning & Auto-Tuning Strategy
 
