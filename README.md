@@ -617,22 +617,29 @@ Esta velocidad resultante es acotada por los límites dinámicos del sistema y v
 
 ## 10.3 Final Model Tuning & Auto-Tuning Strategy
 
-El rendimiento dinámico óptimo de todo el esquema de control depende de la correcta parametrización de sus constantes. Debido a las tolerancias de fabricación y al desgaste mecánico de las cajas reductoras, estos parámetros difieren significativamente en cada articulación[cite: 3, 4].
+El rendimiento dinámico óptimo de todo el esquema de control depende de la correcta parametrización de sus constantes. Debido a las tolerancias de fabricación y al desgaste mecánico, estos parámetros difieren significativamente en cada articulación [cite: 1].
 
-Por defecto, el constructor del controlador inicializa el sistema con valores empíricos pre-calibrados. Por ejemplo, los parámetros resultantes para los ejes principales son[cite: 3, 4]:
-*   **Base (J0):** $K_p = 20.67$, $K_i = 6.17$, $F_{s,\text{up}} = 23.6\%$, $F_{s,\text{down}} = 15.8\%$
-*   **Hombro (J1):** $K_p = 16.14$, $K_i = 4.82$, $F_{s,\text{up}} = 21.8\%$, $F_{s,\text{down}} = 22.4\%$
+Por defecto, el constructor del controlador inicializa el sistema con valores empíricos pre-calibrados [cite: 1]. Por ejemplo, los parámetros resultantes para los ejes principales son:
+*   **Base (J0):** $K_p = 20.67$, $K_i = 6.17$, $F_{s,up} = 23.6\%$, $F_{s,down} = 15.8\%$ [cite: 1]
+*   **Hombro (J1):** $K_p = 16.14$, $K_i = 4.82$, $F_{s,up} = 21.8\%$, $F_{s,down} = 22.4\%$ [cite: 1]
 
-Para garantizar que el brazo mantenga este comportamiento estable tras ser desconectado, el controlador gestiona la persistencia de datos. Mediante la función `setGains()`, se actualizan los parámetros en tiempo de ejecución y se almacenan estructuralmente en la Memoria No Volátil (NVS) del microcontrolador ESP32-S3 a través de la instrucción `_sys->saveGains()`[cite: 3, 4].
+Para garantizar que el brazo mantenga este comportamiento estable tras ser desconectado, el controlador gestiona la persistencia de datos. Mediante la función `setGains()`, se actualizan los parámetros en tiempo de ejecución y se almacenan en la memoria del sistema a través de la instrucción `_sys->saveGains()` [cite: 1].
 
-#### Rutina de Auto-Sintonización (Auto-Tuning)
-Para adaptar el robot al desgaste a largo plazo sin intervención humana, el *firmware* expone un modo de calibración automática llamado `AutoTuneLoop`[cite: 3, 4]. Sus características operativas son:
+### Rutina de Auto-Sintonización (Auto-Tuning)
+Para adaptar el robot al desgaste a largo plazo sin intervención humana, el firmware expone un modo de calibración automática llamado `AutoTuneLoop` [cite: 1]. Sus características operativas son:
 
-*   **Aislamiento y Determinismo:** Cuando se activa la bandera de calibración (`is_tuning`), el orquestador principal detiene las operaciones y trayectorias normales del robot para ceder el control exclusivo a esta rutina, la cual se ejecuta a una frecuencia determinista de **200 Hz** ($dt = 5 \text{ ms}$)[cite: 3, 4].
-*   **Mapeo de Fricción (Zonas Muertas):** El algoritmo inyecta secuencias de pasos escalón en formato de ciclos de trabajo PWM progresivos. Al analizar la retroalimentación directa de los *encoders*, el controlador detecta el punto exacto de ruptura de la inercia, deduciendo así la fricción estática real a favor y en contra de la gravedad ($F_{s,\text{up}}$, $F_{s,\text{down}}$).
-*   **Sintonización PI Autónoma:** Analizando la curva de respuesta temporal frente a los escalones de potencia, el sistema estima matemáticamente las constantes de tiempo de la planta mecánica, calculando de forma automática los parámetros $K_p$ y $K_i$ óptimos para el lazo de velocidad. 
-*   **Aplicación en Caliente:** Al finalizar el ciclo de pruebas, los nuevos parámetros se guardan en la memoria NVS y se aplican inmediatamente, dejando el robot listo para operar con su nueva dinámica[cite: 3, 4].
-
+*   **Aislamiento, Determinismo y Seguridad:** Cuando se activa la bandera de calibración (`is_tuning`), el orquestador principal detiene las operaciones normales del robot para ceder el control a esta rutina [cite: 1]. Se ejecuta a una frecuencia determinista de 200 Hz (dt = 5 ms) y monitorea constantemente las paredes virtuales (`angleLimits`) para abortar automáticamente la prueba si se alcanza un límite de seguridad [cite: 1].
+*   **Mapeo de Fricción por Rampa (Zonas Muertas):** Para superar la inercia estática, el algoritmo inyecta una **rampa progresiva** de potencia PWM (a razón de 10.0 por segundo) en lugar de usar escalones [cite: 1]. Al analizar la retroalimentación de los encoders, el controlador detecta el punto exacto de ruptura cuando la velocidad supera el umbral de 0.03 rad/s, deduciendo así la fricción estática real a favor y en contra de la gravedad (`fric_up` y `fric_down`) [cite: 1].
+*   **Sintonización PI (Lambda Relajado y Skogestad Modificado):** Tras hallar la fricción, el sistema inyecta un pulso escalón adicional de 20 PWM por encima de la fricción estática para evaluar la máxima velocidad en estado estacionario (`sum_amp`) [cite: 1]. Analizando esta respuesta, el sistema estima la constante de la planta ($K_v$) y aplica un método matemático relajado para mecanismos lentos (como las cajas reductoras de tornillo sin fin), calculando los parámetros óptimos mediante:
+    
+    $$K_p = \frac{\tau_{mec}}{K_v \cdot \tau_c}$$
+    
+    Para evitar oscilaciones en motores duros, se abandona la regla clásica y se extiende el tiempo de integración ($T_i$) exigiendo una estabilización suave en 0.8 segundos:
+    
+    $$T_i = \tau_{mec} + 4\tau_c$$
+    
+    Donde $K_i$ se obtiene finalmente dividiendo $K_p$ por el tiempo de integración $T_i$ [cite: 1].
+*   **Aplicación en Caliente con Filtros:** Al finalizar el ciclo matemático, las ganancias se limitan dentro de rangos seguros (Kp máximo de 50.0 y Ki máximo de 80.0) [cite: 1]. Los nuevos parámetros se guardan en la m
 # 11. Kinematic Modeling
 
 # 11. Cinemática del Manipulador
