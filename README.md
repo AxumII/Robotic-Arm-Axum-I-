@@ -99,7 +99,7 @@ The design and implementation of the Axum I followed an iterative engineering wo
 
 Before CAD modeling and physical assembly, analytical models were evaluated to determine the physical constraints, structural requirements, and dynamic limits of the robotic arm.
 
-## 3.1 Torque Analysis & Motor Sizing
+## 3.1 Calculos generales para el torque 
 
 To ensure the actuators can support both static holding loads and dynamic accelerations, torque requirements were evaluated at each joint under maximum cantilever conditions (fully extended horizontal pose):
 
@@ -117,21 +117,40 @@ Where:
 * $\alpha$: Required angular acceleration ($\ddot{\theta}$).
 * $\tau_{\text{friction}}$: Estimated viscous and Coulomb friction losses in bearings and gearboxes.
 
-Para elegir las dimensiones optimas del modelo, se crearon simulaciones en codigo simulando el torque en cualquier pose elegida con la formula anterior, ignorando la friccion viscosa tau debido a que no es posible medirla, se entiende que es significativa. Elcodigo usado, en los anexos se resume en las siguientes formulas. 
+Para elegir las dimensiones optimas del modelo, se crearon simulaciones en codigo simulando el torque en cualquier pose elegida con la formula anterior, ignorando la friccion viscosa tau debido a que no es posible medirla, se entiende que es significativa. 
+El script llamado : es el usado para este menester del calculo del torque necesario para diferentes dimensiones del brazo con diversos motores. 
 
-Cinemática Directa (Transformaciones Homogéneas): El algoritmo ubica cada articulación, centro de masa y punto final (TCP) en un espacio 3D multiplicando matrices de rotación y traslación. Esto permite calcular las distancias reales sin importar qué tan compleja sea la postura del brazo.Torque mediante Producto Cruz: Para adaptar el modelo al espacio 3D, el cálculo proyectado por el coseno se sustituye por el producto cruz entre el vector de distancia (desde el motor hasta el centro de masa o carga) y el vector de gravedad. Solo se toma la magnitud de la fuerza que actúa directamente sobre el eje de rotación de cada motor.Cálculo de Inercia y Aceleración Límite: El programa calcula el momento de inercia proyectando las masas de forma perpendicular al eje de giro. Al restarle al torque nominal del motor el esfuerzo requerido para sostener el brazo (estático), se obtiene el torque dinámico disponible. Con este remanente, el código despeja la aceleración angular máxima ($\alpha$) que el brazo puede soportar antes de fallar, identificando automáticamente la articulación que funciona como "cuello de botella".
+Inicialmente se plantean las distancias en un modelo 3D.
 
+1. Matrices de Transformación Homogénea (Helpers)Para calcular las posiciones de las articulaciones independientemente de la postura del brazo, el código utiliza Transformaciones Homogéneas (4x4). Estas matrices combinan rotación y traslación en una sola operación matricial.El código define funciones (rot_x, rot_y, rot_z) que generan las siguientes matrices de rotación dependiendo del eje sobre el que gire el motor:$$R_x(\theta) = \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & \cos\theta & -\sin\theta & 0 \\ 0 & \sin\theta & \cos\theta & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix}$$$$R_y(\theta) = \begin{bmatrix} \cos\theta & 0 & \sin\theta & 0 \\ 0 & 1 & 0 & 0 \\ -\sin\theta & 0 & \cos\theta & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix}$$$$R_z(\theta) = \begin{bmatrix} \cos\theta & -\sin\theta & 0 & 0 \\ \sin\theta & \cos\theta & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix}$$Y la matriz de traslación (translation) para los desplazamientos (offsets y centros de masa):$$\text{Trans}(v_x, v_y, v_z) = \begin{bmatrix} 1 & 0 & 0 & v_x \\ 0 & 1 & 0 & v_y \\ 0 & 0 & 1 & v_z \\ 0 & 0 & 0 & 1 \end{bmatrix}$$2. Cinemática Directa (forward_kinematics)Esta función calcula la posición exacta en el espacio de cada articulación, su eje de giro (vector Z local) y los centros de masa. Lo logra multiplicando secuencialmente las matrices desde la base hasta la herramienta (TCP):$$T_i = T_{i-1} \cdot R_{\text{eje}}(\theta_i) \cdot \text{Trans}(\text{offset}_i)$$De la matriz resultante $T_i$, el código extrae:Posición de la articulación ($P_{\text{axis}}$): La columna de traslación (primeras 3 filas, 4ta columna).Vector del eje de giro ($\vec{u}_{\text{axis}}$): El vector direccional correspondiente a X, Y o Z de la matriz de rotación.3. Cálculo de Torques Estáticos (calculate_torques_and_limits)En un entorno 3D, el torque estático no se calcula con un simple coseno, sino mediante el producto cruz ($\times$) entre el vector de distancia radial ($\vec{r}$) y el vector de fuerza gravitacional ($\vec{F}_g$).Para cada articulación $i$, se evalúa el peso de todos los eslabones $j$ y cargas posteriores:Vector de distancia: $\vec{r} = P_{\text{masa}} - P_{\text{axis}}$Torque tridimensional total:$$\vec{\tau}_{3D} = \sum_{j>i} \left( \vec{r}_j \times (m_j \cdot \vec{g}) \right) + (\vec{r}_{\text{load}} \times (m_{\text{load}} \cdot \vec{g}))$$Proyección del Torque: Los motores solo sufren esfuerzo en su eje de rotación. El código aísla esta fuerza usando el producto punto ($\cdot$) entre el torque 3D y el vector unitario del eje de giro del motor ($\vec{u}_{\text{axis}}$):$$\tau_{\text{static}} = \vert{}\vec{\tau}_{3D} \cdot \vec{u}_{\text{axis}}\vert{}$$4. Cálculo de Inercia y Restricciones DinámicasPara saber si el motor puede acelerar la carga sin quemarse, el código calcula el momento de inercia ($I$). La inercia depende de la distancia perpendicular de las masas al eje de rotación. El código calcula esta distancia proyectando vectores:Componente paralela al eje:$$\vec{r}_{\parallel} = (\vec{r} \cdot \vec{u}_{\text{axis}}) \vec{u}_{\text{axis}}$$Distancia perpendicular real:$$r_{\perp} = \vert{}\vert{}\vec{r} - \vec{r}_{\parallel}\vert{}\vert{}$$Inercia total en la articulación:$$I_{\text{total}} = \sum \left( m_j \cdot r_{\perp, j}^2 \right)$$Finalmente, el código verifica si el motor tiene capacidad sobrante (torque dinámico) después de soportar el peso estático. Con este remanente, despeja la aceleración máxima que esa articulación puede soportar utilizando la Segunda Ley de Newton para la rotación:$$\alpha_{\text{max}} = \frac{\tau_{\text{rated}} - \tau_{\text{static}}}{I_{\text{total}}}$$Donde $\tau_{\text{rated}}$ es el torque nominal del servo (convertido de kg-cm a N-m mediante las constantes declaradas en el constructor de la clase). Si la aceleración objetivo (alpha_target) excede el valor mínimo calculado de $\alpha_{\text{max}}$ en cualquiera de las articulaciones, el sistema arroja una advertencia (cuello de botella).
 
-## 3.2 Kinematic & Dynamic Constraints
-(Sección vacía - Pendiente por definir)
+## 3.2 Torque Analysis & Motor Sizing
 
-## 3.3 Structural & Material Resistance
-(Sección vacía - Pendiente por definir)
+Frente a las restricciones de torque, estas dependen de los motores disponibles con un torque dado para velocidades angulares bajas, de las cargas de los segmentos y del propio peso de los motores. Además, es necesario considerar el torque del motor tanto en dinámico como en estático, de modo que sea eficiente de acuerdo a su durabilidad interna. Teniendo en cuenta esto, se ejecutaron varias simulaciones y se obtuvieron los siguientes rangos (ver tablas generadas por el script de simulación).
 
-## 3.4 Bill of Materials (BOM) & Component Selection
-(Sección vacía - Pendiente por definir)
+## 3.3 Kinematic & Dynamic Constraints
 
-## 3.5 CAD Modeling & Assembly Constraints
+Dado el torque anterior, también tenemos restricciones dinámicas, siendo la principal restricción las velocidades angulares. Estas, como se mencionó, deben ser bajas tanto para aprovechar un mayor torque (debido a la mayor relación de engranajes), como por la no necesidad de velocidades altas; ya que los brazos, aparte de requerir precisión, al tener un alcance inferior a 50 cm no exigen velocidades lineales altas. Además, a mayor velocidad se requeriría mayor aceleración, lo que dificultaría frenar el brazo al cambiar de poses, convirtiendo una inercia alta en un problema relevante. 
+
+Otra restricción crítica es la aceleración angular máxima ($\alpha_{\text{max}}$) dictada por el torque dinámico disponible y el momento de inercia total del sistema:
+
+$$ \alpha_{\text{max}} = \frac{\tau_{\text{nominal}} - \tau_{\text{estático}}}{I_{\text{total}}} $$
+
+Esta aceleración debe ser lo suficientemente alta para mover el brazo con soltura, pero lo suficientemente baja para evitar problemas de frenado y mantener los requerimientos de inercia acotados. También se evaluaron casos de diseño empleando sistemas de poleas para mitigar el peso en los eslabones distales. 
+Dadas las restricciones del inciso anterior, el código anexo genera las tablas que muestran los parámetros de aceleraciones angulares resultantes para cada postura.
+
+## 3.4 Structural & Material Resistance
+
+Para esta sección se analizan los posibles materiales para el brazo, teniendo en cuenta las cargas estáticas y dinámicas anteriores. En general, el cálculo geométrico se asume con secciones transversales de 30x50 mm. Dadas las restricciones monetarias y la disponibilidad de métodos de fabricación (Impresión 3D y corte láser), se evaluaron tres materiales principales: MDF, PLA y ABS. 
+
+Se evaluaron las distancias cinemáticas con perfiles de estos materiales. Para el caso específico del MDF, se adaptó el cálculo para usar láminas con secciones de 8x40 mm. Los segmentos de brazos más cortos a calcular son de 20 mm (con muñecas de 10 mm), mientras que los máximos evaluados alcanzan los 45 cm (con muñecas de 25 mm)[cite: 1]. 
+
+Los resultados comparativos de masa e inercia según el material elegido alimentan la simulación y se resumen en la siguiente tabla de resultados arrojada por el script.
+
+## 3.5 Bill of Materials (BOM) & Component Selection
+Dado los resultados de los calculos anteriores 
+
+## 3.6 CAD Modeling & Assembly Constraints
 (Sección vacía - Pendiente por definir)
 
 
