@@ -189,16 +189,35 @@ $$
 \delta = \frac{F_{\text{punta}} \cdot L^3}{3 \cdot E \cdot I} + \frac{W_{\text{propio}} \cdot L^3}{8 \cdot E \cdot I}
 $$
 
-> *(Insertar aquí gráficas arrojadas por los scripts evaluar_barrido_multi_material y evaluar_deformacion_seccion)*
+
+<img width="1920" height="975" alt="Grafica Torques vs Longitud" src="https://github.com/user-attachments/assets/d853dbce-5ba6-464b-bdf9-768232c26adc" />
+
+<img width="1920" height="975" alt="Deflection vs Width" src="https://github.com/user-attachments/assets/7f761af7-6d26-4d27-a23e-ce8fe1f9fdec" />
+
+<img width="1000" height="800" alt="Cin Pose" src="https://github.com/user-attachments/assets/eb0c463e-0e98-4100-8dfa-58fef866560d" />
+
+A continuación, se presenta la tabla con los resultados para la configuración geométrica elegida ($L = 300\text{ mm}$), evaluando la postura estirada de mayor exigencia, junto con su respectiva representación cinemática tridimensional:
+
+**ANÁLISIS DE POSTURA: [0.0, 0.0, 0.0, 0.0] | Carga: 200.0g | Acel. Deseada: 5.0 rad/s²**
+
+| Articulación | Límite [kg·cm] | T. Estático [kg·cm] | T. Dinámico [kg·cm] | T. Total [kg·cm] | Acel. MAX [rad/s²] | Factor de Seguridad (FS) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **J0 (Z)** | 21.0 | 0.00 | 9.13 | 9.13 | 11.51 | 2.30 |
+| **J1 (Y)** | 70.0 | 36.72 | 8.86 | 45.58 | 18.78 | 1.54 |
+| **J2 (Y)** | 21.0 | 12.32 | 1.56 | 13.87 | 27.89 | 1.51 |
+| **J3 (Y)** | 21.0 | 2.03 | 0.09 | 2.12 | 1080.09 | 9.92 |
+
+> **Resultado de la Simulación:** **ÉXITO**. La aceleración deseada es soportada adecuadamente por los motores seleccionados. (El cuello de botella en todo el brazo se encuentra en 11.51 rad/s²).
+
+Se eligio esa postura dado los factores de seguridad de 1.5, que permiten tener suficiente seguridad sin considerar factores extra como excentricidades, friccion viscosa. Tambien se uso una carga de 200g considerando un caso excesivo, el cual aun es seguro. 
 
 ## 3.5 Bill of Materials (BOM) & Component Selection
 
 Con base en los resultados del remanente de torque y la viabilidad del mercado, se establece la siguiente lista de componentes principales requeridos para satisfacer la dinámica del sistema:
 
-*   **Actuadores:** Motorreductores DC tipo Worm/Planetario equipados con encoders de cuadratura para el cierre del lazo de control de posición.
+*   **Actuadores:** Motorreductores DC tipo Worm equipados con encoders de cuadratura ya integrados para el cierre del lazo de control de posición. Tres iguales y uno de mayor carga para el hombro.
 *   **Microcontrolador (Hardware-in-the-Loop):** ESP32-S3 (N16R8) para gestionar las interrupciones de los encoders, la matemática de coma flotante de las matrices cinemáticas y la generación de señales de control PWM.
-*   **Interfaz de Usuario (HMI):** Pantalla ST7789 vía SPI integrada con joysticks analógicos y un teclado matricial para el modo de operación manual y rutinas de calibración.
-*   **Mecánica y Transmisión:** Poleas dentadas GT2 para sistemas de transmisión (donde se requiera alejar el peso de los eslabones distales), rodamientos radiales para absorber las cargas axiales/radiales mitigando la fricción teórica ($\tau_{\text{friction}}$), y anillos de retención (Seeger circlips) para fijar los ejes estructurales de manera segura.
+*   **Mecánica y Transmisión:** Se descarta cualquier tipo de transision extra, complejiza el diseño y no aportan un rendimiento significativo frente al que ya esta, ademas de que encarece el ensamble.
 
 ## 3.6 CAD Modeling & Assembly Constraints
 
@@ -206,4 +225,57 @@ El paso de la formulación analítica al software de diseño asistido por comput
 
 1.  **Parámetros de Fabricación Aditiva:** Para que la resistencia estructural final corresponda a la matriz analítica de deflexión ($\delta$), las piezas impresas (PLA/ABS) deben parametrizarse en laminadores como PrusaSlicer o Cura respetando el 30% de infill cúbico. Además, se debe aumentar el grosor de las paredes perimetrales (shell thickness) específicamente en las uniones de los motores J1 y J2 para mitigar la fatiga por concentración de esfuerzos.
 2.  **Alineación de Ejes:** Como dictamina la matriz de rotación, la articulación de la base debe ser estrictamente vertical. Los planos CAD deben garantizar tolerancias precisas (H7/g6) para los rodamientos de apoyo de la base, previniendo cabeceos durante las aceleraciones altas.
-3.  **Distribución de Masas (Inercia):** El diseño debe integrar la placa del ESP32-S3 y la etapa de potencia lo más cerca posible del punto de anclaje de J0 o en un compartimento estacionario externo. Esto previene un aumento parasitario en el parámetro $m_i$ de los eslabones móviles que colapsaría el cálculo del momento de inercia ($I_{\text{total}}$).
+3.  **Distribución de Masas (Inercia):** El diseño debe tener un enfoque que no tenga elementos tan pesados y con la inercia minima posible y de manera mas uniforme para simplificar los calculos.
+4.  **Ensamble Practico:** Debe ser diseñado de manera que cada articulacion sea ensamblada y desensamblada de una forma rapida, en caso de falla, cambio de pieza y transporte.
+5.  **Uniones con Motores:** Las articulaciones se unen con bridas D Shaft, de modo que se atornillan junto a las articulaciones.
+6.  **Tornilleria:** Las articulaciones, la base, las protecciones, las tapas y las herramientas se deben unir con tornilleria M3 y M4, se usan tolerancias de 0.5mm para ajuste y 1mmm para rotacion.
+
+
+# 4. MDF Prototype (Proof of Concept)
+
+Con el fin de validar el modelo analítico y la cinemática tridimensional antes de incurrir en los costos y tiempos de fabricación de la impresión 3D final, se optó por construir un prototipo de prueba de concepto (PoC) o versión cero (v0) utilizando piezas macizas de MDF. Este enfoque permite realizar iteraciones rápidas de *hardware-in-the-loop* y afinar el control *firmware* de los motores reales bajo carga mecánica.
+
+## 4.1 MDF CAD Design (v0)
+
+El diseño CAD de esta primera iteración hereda estrictamente las dimensiones óptimas dictadas por las simulaciones del apartado anterior. Para los eslabones principales se adoptó un perfil macizo de MDF de 8x40 mm, manteniendo la envergadura base del brazo paramétrico:
+
+*   **Hombro ($L_2$):** 300 mm.
+*   **Codo ($L_3$):** 210 mm ($0.7 \cdot L_2$).
+*   **Muñeca ($L_4$):** 90 mm ($0.3 \cdot L_2$).
+
+El ensamble fue concebido para ser mecanizado mediante corte láser o ruteadora CNC, incorporando los alojamientos exactos para las bridas *D-Shaft* de los motores DC Brushed (JGY370 y 5840-31ZY). Este modelo CAD preliminar permite evaluar físicamente el espacio de trabajo real, las colisiones propias de la estructura y el enrutamiento del cableado hacia los actuadores y *encoders*.
+
+*(Insertar aquí: Planos de ensamble CAD del prototipo en MDF con cotas generales)*
+> **Figura 4.1.1:** Planos generales del prototipo v0 en MDF. Se aprecian las distancias entre centros de rotación (300 mm, 210 mm, 90 mm) y los puntos de anclaje de los motores.
+
+## 4.2 Test Firmware & Control Architecture
+
+Para la validación de los actuadores en el prototipo, se desarrolló un *firmware* de bajo nivel en C++ ejecutado sobre un microcontrolador ESP32-S3 (N16R8). En lugar de utilizar bucles de control avanzados, usa un simple control de velocidad dando porcentajes de PWM y ver la velocidad angular y el angulo relativo en la telemetria. 
+
+**1. Abstracción de Hardware**
+El sistema mapea de forma contigua los periféricos (pines de *encoders* y salidas PWM) utilizando arreglos indexados para las cuatro articulaciones. Para solucionar problemas comunes en el ensamblaje mecánico (como motores que quedan físicamente girados respecto a su eje teórico), se implementaron banderas booleanas (`INVERTIR_MOTOR` e `INVERTIR_ENCODER`). Estas variables permiten cruzar por *software* las señales de control de los puentes H (intercambiando los canales PWM izquierdo/derecho) y los canales A/B de los *encoders*. Adicionalmente, el código calcula dinámicamente la resolución total de cada articulación en Pulsos Por Revolución (PPR) multiplicando los pulsos base del *encoder* por 4 (cuadratura) y por la relación de las cajas reductoras mecánicas (1154:1 para el hombro y 1000:1 para el resto).
+
+**2. Gestión de Memoria No Volátil (NVS) Orientada a Eventos**
+Para evitar la degradación prematura de la memoria Flash del microcontrolador —causada por escrituras cíclicas continuas en el bucle principal— el sistema registra la posición de manera condicional utilizando la librería `Preferences`. La rutina de escritura en NVS (`guardarPosicionNVS`) captura el conteo absoluto y los *offsets* de calibración de una articulación única y exclusivamente cuando esta alcanza una detención voluntaria (PWM = 0) o cuando se gatilla una parada de emergencia. Este enfoque garantiza que el brazo no pierda su marco de referencia espacial tras un corte súbito de energía, permitiendo reanudar la operación exactamente en la pose donde se detuvo.
+
+**3. Lazo Rápido Anti-Colisión (Seguridad Activa)**
+El *firmware* implementa una rutina de seguridad prioritaria que se ejecuta cada 50 milisegundos mediante un temporizador asíncrono. Esta función adquiere la tensión analógica de sensores de corriente a través de un ADC externo de alta precisión (ADS1115) vía I2C. La lectura pasa por un filtro de zona muerta (ignora ruidos menores a 0.03V) y se restan los *offsets* en reposo (`OFFSETS_IS`) antes de aplicar los factores de conversión a amperios específicos para cada familia de motor (20.0 A/V para el 31ZY y 13.6 A/V para los JGY370). Si la corriente resultante supera los límites de bloqueo o *stall current* predefinidos (6.5A para el hombro y 1.2A para las demás), el sistema interrumpe inmediatamente el PWM, bloquea la articulación afectada, registra la colisión y salva el estado en la memoria NVS.
+
+**4. Interfaz de Comandos y Telemetría**
+El sistema es gobernado mediante un analizador de comandos por puerto serial (Serial Parser). La arquitectura soporta instrucciones complejas como:
+*   **Comandos de Movimiento Temporizado (T):** Permite inyectar un porcentaje de PWM durante una ventana de tiempo estricta en milisegundos y luego aplicar un freno activo automático.
+*   **Calibración (Z):** Establece el *offset* dinámico para dictar el "cero" relativo (Home) de una articulación.
+paralelo emite tramas de telemetría cada 500 ms reportando el estado del voltaje del banco de baterías, el consumo en amperios y el ángulo absoluto articular (transformado desde el conteo de pulsos descontando el *offset*).
+
+## 4.3 Experimental Results & Iteration
+
+Una vez ensamblado el prototipo en MDF y acoplado el sistema de control basado en el ESP32-S3, se procedió a someter la estructura a pruebas dinámicas y estáticas. El objetivo principal de esta iteración es recopilar datos empíricos que permitan realizar ajustes en el diseño CAD final (v1) orientado a la impresión 3D, evaluando los siguientes aspectos clave:
+
+1.  **Validación de Torques y Consumo de Corriente:**
+    *   *(Pendiente: Describir el comportamiento térmico y de consumo eléctrico de los motores JGY370 y 5840-31ZY bajo la carga real. Comparar los picos de corriente obtenidos vía telemetría con los límites teóricos).*
+2.  **Precisión Geométrica y Holguras (Backlash):**
+    *   *(Pendiente: Registrar las desviaciones observadas en el actuador final (TCP) debido a la flexión del MDF y al juego mecánico natural de las cajas reductoras tipo Worm).*
+3.  **Respuesta del Sistema Anti-Colisión y NVS:**
+    *   *(Pendiente: Detallar la efectividad de la rutina de seguridad al saturar la carga intencionalmente y confirmar si el restablecimiento de posición desde la memoria Flash funciona correctamente tras un corte de energía).*
+4.  **Ajustes Estructurales para la v1 (Impresión 3D):**
+    *   *(Pendiente: Listar las conclusiones y modificaciones geométricas requeridas para el modelo final; por ejemplo, reubicación de centros de masa, refuerzo de uniones o ajuste de tolerancias para los acoples D-Shaft).*
