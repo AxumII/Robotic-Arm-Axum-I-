@@ -229,6 +229,7 @@ El paso de la formulación analítica al software de diseño asistido por comput
 4.  **Ensamble Practico:** Debe ser diseñado de manera que cada articulacion sea ensamblada y desensamblada de una forma rapida, en caso de falla, cambio de pieza y transporte.
 5.  **Uniones con Motores:** Las articulaciones se unen con bridas D Shaft, de modo que se atornillan junto a las articulaciones.
 6.  **Tornilleria:** Las articulaciones, la base, las protecciones, las tapas y las herramientas se deben unir con tornilleria M3 y M4, se usan tolerancias de 0.5mm para ajuste y 1mmm para rotacion.
+7.  **Acople de Bridas:**Se debe diseñar ranuras especificas que permitan en ciertas posiciones apretar y aflojar las bridas para el desarme, lo cual puede debilitar la estructura. 
 
 
 # 4. MDF Prototype (Proof of Concept)
@@ -239,15 +240,16 @@ Con el fin de validar el modelo analítico y la cinemática tridimensional antes
 
 El diseño CAD de esta primera iteración hereda estrictamente las dimensiones óptimas dictadas por las simulaciones del apartado anterior. Para los eslabones principales se adoptó un perfil macizo de MDF de 8x40 mm, manteniendo la envergadura base del brazo paramétrico:
 
-*   **Hombro ($L_2$):** 300 mm.
-*   **Codo ($L_3$):** 210 mm ($0.7 \cdot L_2$).
+*   **Hombro ($L_2$):** 250 mm.
+*   **Codo ($L_3$):** 200 mm ($0.7 \cdot L_2$).
 *   **Muñeca ($L_4$):** 90 mm ($0.3 \cdot L_2$).
 
-El ensamble fue concebido para ser mecanizado mediante corte láser o ruteadora CNC, incorporando los alojamientos exactos para las bridas *D-Shaft* de los motores DC Brushed (JGY370 y 5840-31ZY). Este modelo CAD preliminar permite evaluar físicamente el espacio de trabajo real, las colisiones propias de la estructura y el enrutamiento del cableado hacia los actuadores y *encoders*.
+El ensamble fue concebido para ser mecanizado mediante corte láser y taladro casero, incorporando los alojamientos exactos para las bridas *D-Shaft* de los motores DC Brushed (JGY370 y 5840-31ZY). Este modelo CAD preliminar permite evaluar físicamente el espacio de trabajo real, las colisiones propias de la estructura y el enrutamiento del cableado hacia los actuadores y *encoders*.
 
 *(Insertar aquí: Planos de ensamble CAD del prototipo en MDF con cotas generales)*
 > **Figura 4.1.1:** Planos generales del prototipo v0 en MDF. Se aprecian las distancias entre centros de rotación (300 mm, 210 mm, 90 mm) y los puntos de anclaje de los motores.
 
+NO LOS ENCUENTRO XDXDXD
 ## 4.2 Test Firmware & Control Architecture
 
 Para la validación de los actuadores en el prototipo, se desarrolló un *firmware* de bajo nivel en C++ ejecutado sobre un microcontrolador ESP32-S3 (N16R8). En lugar de utilizar bucles de control avanzados, usa un simple control de velocidad dando porcentajes de PWM y ver la velocidad angular y el angulo relativo en la telemetria. 
@@ -271,11 +273,127 @@ paralelo emite tramas de telemetría cada 500 ms reportando el estado del voltaj
 
 Una vez ensamblado el prototipo en MDF y acoplado el sistema de control basado en el ESP32-S3, se procedió a someter la estructura a pruebas dinámicas y estáticas. El objetivo principal de esta iteración es recopilar datos empíricos que permitan realizar ajustes en el diseño CAD final (v1) orientado a la impresión 3D, evaluando los siguientes aspectos clave:
 
-1.  **Validación de Torques y Consumo de Corriente:**
-    *   *(Pendiente: Describir el comportamiento térmico y de consumo eléctrico de los motores JGY370 y 5840-31ZY bajo la carga real. Comparar los picos de corriente obtenidos vía telemetría con los límites teóricos).*
+1.  **Validación de Torques, Velocidades y Consumo de Corriente:**
+    *   Al usar cargas de prueba de 200g, los motores mostraron un consumo mayor que sin carga, sin embargo, nada distinto a lo mostrado por los datasheet
+    *   De igual manera con las velocidades angulares, siendo solo ligeramiente inferiores a 4RPM cuando tenia una carga, correspondiendose al datasheet de ambos motores. 
 2.  **Precisión Geométrica y Holguras (Backlash):**
     *   *(Pendiente: Registrar las desviaciones observadas en el actuador final (TCP) debido a la flexión del MDF y al juego mecánico natural de las cajas reductoras tipo Worm).*
+    *   Para este apartado se evidencio que si bien, parece tener cierta presicion en marcar angulos, el juego mecanico de los motores es de entre 2 a 3°, ademas de añadir el juego mecanico cuando no se aprieta correctamente el prisionero de la brida D shaft.
 3.  **Respuesta del Sistema Anti-Colisión y NVS:**
-    *   *(Pendiente: Detallar la efectividad de la rutina de seguridad al saturar la carga intencionalmente y confirmar si el restablecimiento de posición desde la memoria Flash funciona correctamente tras un corte de energía).*
+    *   Se guarda correctamente la posicion registrada cuando se desenergiza, optimo para no depender de ajustes a un home antes de desenergizar.
 4.  **Ajustes Estructurales para la v1 (Impresión 3D):**
     *   *(Pendiente: Listar las conclusiones y modificaciones geométricas requeridas para el modelo final; por ejemplo, reubicación de centros de masa, refuerzo de uniones o ajuste de tolerancias para los acoples D-Shaft).*
+    *   Es necesario corregir el soporte axial, ya que este no soporta una carga axial y tiende a tanto deflectar la base donde se apoya el motor impidiendo el giro en el eje Z.
+    *   Los motores soportan perfectamente las cargas radiales y los torques propuestos, aunque si es menester reforzar la estructura para evitar deflexiones.
+
+<img width="1599" height="899" alt="image" src="https://github.com/user-attachments/assets/92089393-9302-403e-8fcd-d3eca551c33d" />
+<img width="1599" height="899" alt="image" src="https://github.com/user-attachments/assets/63f6986d-2d6a-4d18-8f7b-44ac6d6fac5d" />
+<img width="1599" height="899" alt="image" src="https://github.com/user-attachments/assets/479d42b9-4247-4aa9-b7c7-b79fd48ef031" />
+
+TOCA BUSCAR EL VIDEO DE ESTA MONDA MOVIENDOSE :V 
+
+
+# 5. Mechanical & Physical Design Process
+
+Tras la validación analítica y experimental de la prueba de concepto en MDF, se procedió a la fase de diseño CAD detallado y diseño para fabricación aditiva (DFAM - *Design for Additive Manufacturing*). En esta sección se documenta el diseño tridimensional de las piezas finales impresas en PLA/ABS, optimizadas para soportar las cargas calculadas, alojar la electrónica y garantizar un ensamblaje preciso.
+
+## 5.1 Base Design & Lazy Susan Mechanism
+
+El diseño de la base (Articulación J0) es crítico para la estabilidad global del sistema. Se implementó un mecanismo giratorio inspirado en el concepto de *Lazy Susan*, apoyado en rodamientos axiales y radiales que absorben las fuerzas de compresión y los momentos de vuelco generados por el brazo en extensión.
+*   *(Pendiente: Añadir renders de la base, especificaciones del rodamiento central utilizado y detalles de fijación del motor JGY370).*
+
+## 5.2 Shoulder Joint Design
+
+El hombro (J1) es la articulación sometida al mayor torque estático y dinámico. Su geometría fue engrosada y reforzada con un mayor número de paredes perimetrales (*shell thickness*) en el laminador. El diseño incluye el alojamiento específico para el motorreductor 5840-31ZY y una brida de transmisión directa (*D-Shaft*) que previene el deslizamiento bajo cargas pesadas.
+*   *(Pendiente: Añadir vistas en sección del anclaje del motor y el enrutamiento de cables para J2 y J3).*
+
+## 5.3 Elbow Joint Design
+
+El segmento del codo (J2) fue diseñado con un enfoque de reducción de masa sin comprometer la rigidez estructural. Se utilizó topología aligerada donde el análisis de deflexión lo permitió. Aloja un motor JGY370 encargado de levantar la masa remanente de la muñeca y la herramienta.
+*   *(Pendiente: Mostrar capturas del modelo CAD resaltando las zonas aligeradas y los puntos de inserción de tornillería M3/M4).*
+
+## 5.4 Wrist Joint Design
+
+La muñeca (J3) alberga el actuador final responsable del cabeceo de la herramienta. Dado que se ubica en el extremo distal, su peso fue minimizado al máximo. Cuenta con una interfaz de montaje estandarizada (brida universal) que permite el intercambio rápido de distintos efectores finales (*End-Effectors*).
+*   *(Pendiente: Ilustrar el mecanismo de acople rápido y los límites físicos de rotación).*
+
+## 5.5 End-Effectors & Tools
+
+El brazo fue concebido como una plataforma modular capaz de interactuar con diversos objetos mediante efectores intercambiables, los cuales se describen a continuación:
+
+### 5.5.1 Calibration Tool
+Una herramienta rígida de geometría puntiaguda utilizada exclusivamente para las rutinas de *Homing* y calibración espacial. Permite al usuario alinear el brazo a una coordenada absoluta (X, Y, Z) conocida y establecer los *offsets* de los *encoders*.
+
+### 5.5.2 Grippers (v1 & v2)
+Evolución iterativa de pinzas mecánicas de agarre (*Grippers*):
+*   **v1:** Primer prototipo de agarre paralelo, impulsado por un micro-servo.
+*   **v2:** Iteración mejorada con cinemática optimizada para un mayor rango de apertura y almohadillas antideslizantes.
+*   *(Pendiente: Renders de las garras y cinemática de los eslabones del gripper).*
+
+### 5.5.3 Electromagnets (v1 & v2)
+Herramienta magnética para manipulación de cargas ferromagnéticas:
+*   **v1:** Electroimán básico de baja potencia para pruebas de concepto de *Pick & Place*.
+*   **v2:** Módulo electromagnético con disipador integrado y control dedicado por relé (conectado al PCF8574).
+
+## 5.6 Control Box Enclosure
+
+Gabinete diseñado para alojar la electrónica central del brazo, separando la etapa de potencia de la lógica de control. El diseño incluye ventilación pasiva/activa, soportes para los controladores de motores (Puentes H), conversores *Step-Down*, el arreglo de relés y la placa principal del ESP32-S3.
+*   *(Pendiente: Fotos del gabinete impreso, distribución interna de la electrónica y salidas de cables).*
+
+## 5.7 Overall Mechanical Assembly
+
+Integración tridimensional de todos los subensambles. El modelo maestro verifica la ausencia de interferencias volumétricas (colisiones propias del CAD) a lo largo de todo el espacio de trabajo teórico del brazo robótico.
+*   *(Pendiente: Render isométrico final del brazo completamente ensamblado).*
+
+---
+
+# 6. Engineering Drawings & Schematics
+
+Esta sección contiene los planos técnicos normalizados generados a partir del modelo CAD para facilitar su fabricación, verificación y ensamblaje. Los planos incluyen tolerancias clave para agujeros pasantes y de interferencia (ajustes para insertos roscados y rodamientos).
+
+*   *(Pendiente: Enlazar PDFs o imágenes de alta resolución de los planos 2D con vistas ortogonales, cortes y detalles de las piezas más complejas).*
+
+---
+
+# 7. Assembly Guide
+
+Guía paso a paso para la construcción física del brazo robótico. Se detallan las herramientas necesarias, la tornillería empleada (M3, M4) y el orden lógico de montaje para evitar retrabajos debido a componentes inaccesibles.
+
+## 7.1 Base Assembly
+1.  *(Pendiente: Pasos de ensamble de rodamientos, base y motor J0).*
+2.  *(Pendiente: Inserción de tuercas/tornillería).*
+
+## 7.2 Shoulder Assembly
+1.  *(Pendiente: Montaje del motor 5840-31ZY y brida D-Shaft).*
+2.  *(Pendiente: Acople de la horquilla del hombro a la base giratoria).*
+
+## 7.3 Elbow Joint Assembly
+1.  *(Pendiente: Ensamblaje del eslabón principal, enrutamiento temprano de cables).*
+2.  *(Pendiente: Fijación del motor JGY370 para el codo).*
+
+## 7.4 Wrist Assembly
+1.  *(Pendiente: Montaje del actuador final y acople de la brida universal).*
+
+## 7.5 Tool / End-Effector Integration
+1.  *(Pendiente: Procedimiento de cambio rápido de herramientas y conexión de sus respectivos cables de actuadores auxiliares).*
+
+---
+
+# 8. Electrical Integration & Wiring
+
+Documentación del *hardware* electrónico, cableado de potencia y transmisión de señales lógicas. El objetivo es asegurar un enrutamiento de cables seguro que resista la fatiga mecánica del movimiento y aísle el ruido electromagnético de los motores respecto a la lógica I2C y los *encoders*.
+
+## 8.1 Wiring & Connection Diagrams
+Diagrama esquemático unifilar del sistema completo. Muestra la interconexión entre la fuente de alimentación, convertidores lógicos, placa ESP32-S3, expansor I2C (PCF8574), ADC (ADS1115), Puentes H y *encoders*.
+*   *(Pendiente: Imagen del diagrama de conexiones - Fritzing, KiCad o esquemático en bloque).*
+
+## 8.2 Soldering & PCB Assembly
+Detalles sobre la construcción física de la placa controladora. Se documenta el uso de protoboards soldables (o PCB dedicada), la disposición de los conectores (Headers) para un mantenimiento modular y las técnicas de soldadura empleadas para las líneas de alta corriente.
+*   *(Pendiente: Fotografías de la placa ensamblada (top/bottom) y asignación de pines físicos).*
+
+## 8.3 Control Box Wiring
+Gestión del cableado dentro del gabinete de control (*cable management*). Incluye la protección de cables con malla expansible (*cable sleeving*), terminaciones con terminales tipo férula/Dupont, y el alivio de tensión (*strain relief*) en la salida de los manguitos hacia el brazo robótico.
+*   *(Pendiente: Fotos del cableado interno, diagramas de distribución de potencia desde la bornera principal).*
+
+
+
