@@ -1358,100 +1358,157 @@ Registra datos a **100 Hz (cada 10ms)** para graficarlos externamente (ej. en Ex
 
 ## 14.1 Rendimiento de Posicionamiento Angular (Angular Positioning Performance)
 
-Se evaluó la capacidad del controlador PID en cascada para alcanzar y mantener referencias articulares estáticas. Se enviaron comandos de paso (*step*) a cada articulación ($q_0, q_1, q_2, q_3$) y se registró la respuesta transitoria y el error en estado estable. 
+Se evaluó la capacidad del controlador PID en cascada para alcanzar y mantener referencias articulares estáticas. Para ello, se enviaron comandos escalón (*step*) a cada articulación ($q_0, q_1, q_2, q_3$) y se registró tanto la respuesta transitoria como el error en estado estacionario.
 
-* *(Insertar aquí descripción de la respuesta: tiempo de asentamiento, sobreimpulso, y el error estático residual medio en grados).*
-* *(Añadir referencia a una gráfica de respuesta al escalón articular).*
-* 
+Los resultados demuestran una convergencia sumamente precisa hacia la referencia, con un error residual casi nulo. Esta precisión está limitada únicamente por las tolerancias mecánicas (backlash) de los reductores empleados: 0.0081° para las cajas JGY y 0.0152° para el motor 31ZX. Como se observa en las gráficas, el sistema de control logra mitigar el sobreimpulso (*overshoot*), resultando en un comportamiento estable en todos los actuadores.
 
-https://drive.google.com/file/d/1l5OTve27GERaM9chQBQAgsrRTndhh3gg/view?usp=sharing
-
-Al llegar a una posicion, se evidencia numericamente como llega a un valor casi exacto, apenas limitado por la tolerancia permitida de las cajas de 0.0081° de los JGY y de 0.0152 del motor 31ZX.
+[Ver video de la prueba de posicionamiento](https://drive.google.com/file/d/1l5OTve27GERaM9chQBQAgsrRTndhh3gg/view?usp=sharing)
+<img width="1200" height="1000" alt="Analisis Sobreimpulso" src="https://github.com/user-attachments/assets/ba7ffb7c-9835-4bd6-ad9d-4ee417f11c79" />
 <img width="408" height="210" alt="image" src="https://github.com/user-attachments/assets/124c4c81-5937-430d-89cb-3be643ef05ca" />
 
 
 ## 14.2 Trayectoria de Movimiento en el Espacio Libre (Free-Space Motion Trajectory)
 
-Esta prueba evaluó los movimientos de tipo Point-to-Point (PTP) utilizando interpolación articular pura con el comando MovJ. Se verificó que el sistema generara perfiles de velocidad suaves interpoladas sin saturar los actuadores, garantizando un desplazamiento fluido entre posiciones distantes del espacio de trabajo sin seguir una ruta cartesiana estricta como se muestra en el siguiente video.
+Esta prueba evaluó los movimientos de tipo *Point-to-Point* (PTP) utilizando interpolación articular pura a través del comando `MovJ`. Se configuró una cuadrícula de prueba con puntos separados por 100 mm.
 
-https://drive.google.com/file/d/1bC-rdAKs7JnAJDkAYemPbMjBOrvM5eoC/view?usp=sharing
+El objetivo fue verificar la generación de perfiles de velocidad suaves e interpolados, garantizando un desplazamiento fluido entre posiciones distantes sin saturar los actuadores y sin la restricción de seguir una ruta cartesiana estricta.
 
-TABLA
-
+[Ver video de movimiento en el espacio libre](https://drive.google.com/file/d/1bC-rdAKs7JnAJDkAYemPbMjBOrvM5eoC/view?usp=sharing)
+<img width="484" height="334" alt="image" src="https://github.com/user-attachments/assets/923bd132-da65-4b15-b50f-84078957960d" />
 <img width="1600" height="1200" alt="WhatsApp Image 2026-07-28 at 11 07 58 PM" src="https://github.com/user-attachments/assets/97837a18-536a-4930-b54e-e88f4af1e271" />
 Cada cuadro tiene lados de 100mm  y se usaron comandos MJ para todos los puntos. 
 
-Se evidencia un desfase significativo en el eje X base de 15mm que aumenta progresivamente con la lejania del origen, el desfase en Y es menor aunque tiene un comportamiento similar. El resultado consta de poligonos que aumentan el angulo respecto a cuanto mas se alejan, lo que se explica por el error de Backlash de los motores usados que ronda entre 2 a 5° dependiendo del ajuste del prisionero. Sin embargo si se conservan las distancias entre puntos si se elimina ese desfase. Otro error importante es el de calibracion del cero inicial dado a que este añade desfase a los angulos y añade mayor deformacion a las trayectorias. 
+Se registró un desfase progresivo a medida que el efector se aleja del origen, alcanzando una desviación de 15 mm en el eje X base (el eje Y presenta un comportamiento similar pero de menor magnitud). Este error geométrico se atribuye principalmente al *backlash* mecánico de los motores (estimado entre 2° y 5°, dependiendo del ajuste de los prisioneros) y a ligeras imprecisiones en la calibración del "cero" inicial. Sin embargo, las distancias relativas entre puntos se conservan correctamente.
 
 ## 14.3 Precisión en el Seguimiento de Línea (Line-Following Accuracy)
 
-Se programó el efector final para trazar una trayectoria rectilínea entre el punto (300 0 5) y el punto (300 -300 5) en el espacio tridimensional. El objetivo es evaluar la desviación cartesiana del efector respecto a la línea ideal. Se trazo una linea respecto a los dos puntos y se compararon los dos controladores. 
+Se programó el efector final para trazar una trayectoria rectilínea en el espacio tridimensional, partiendo del punto `[300, 0, 5]` hasta el punto `[300, -300, 5]`. Para evaluar la desviación cartesiana, se trazó una línea física de referencia y se comparó el desempeño de dos métodos de control.
 
 ### 14.3.1 Control en el Espacio Articular (Joint-Space Control)
-La línea fue discretizada en múltiples puntos (*via-points*) calculados con cinemática inversa estática. Entre cada punto, las articulaciones se movieron mediante interpolación articular como se muestra en el siguiente video.
+La trayectoria fue discretizada en múltiples puntos de paso (*via-points*) resolviendo la cinemática inversa de forma estática. Las articulaciones se movieron mediante interpolación articular. Aunque el seguimiento de la trayectoria ideal es aceptable, el *backlash* mecánico introduce ligeras desviaciones.
 
-https://drive.google.com/file/d/1IGybRSNwwlhfO0f9gVmJ1augvXSzRUta/view?usp=sharing
+[ Ver video: Seguimiento articular (MovL)](https://drive.google.com/file/d/1IGybRSNwwlhfO0f9gVmJ1augvXSzRUta/view?usp=sharing)
 
-Se usaron los comandos 
-ML 300 0 8 50 -90 , ML 300 -100 8 50 -90 , ML 300 -200 8 50 -90 y ML 300 -300 8 50 -90
-Se evidencia que si bien intenta seguir la linea recta marcada por la regla y el error no es tan significativo , el backlash de los motores es importante y afecta la medicion. 
+**Comandos ejecutados:**
+```text
+ML 300 0 8 50 -90
+ML 300 -100 8 50 -90
+ML 300 -200 8 50 -90
+ML 300 -300 8 50 -90
+```
 
 ### 14.3.2 Control Diferencial Jacobiano (Jacobian Differential Control)
-Se ejecutó la misma recta implementando el método de la matriz Jacobiana. El vector de velocidad cartesiana se tradujo continuamente en velocidades articulares como se muestra en el video.
+Se ejecutó la misma trayectoria implementando el método de la matriz Jacobiana, donde el vector de velocidad cartesiana se traduce continuamente en velocidades articulares.
 
 https://drive.google.com/file/d/1VYa0rV2wwYvCG0zg-fcDHO6ga-VXenTe/view?usp=sharing
 
 Se usaron los comandos 
-MLJ 300 0 8 50 -90 , MLJ 300 -100 8 50 -90 , MLJ 300 -200 8 50 -90 y MLJ 300 -300 8 50 -90 
+```text
+MLJ 300 0 8 50 -90
+MLJ 300 -100 8 50 -90
+MLJ 300 -200 8 50 -90
+MLJ 300 -300 8 50 -90
+```
 
-Se evidencia que ambas lineas son similares, aunque el seguimiento del jacobiano MovLJc es mucho mas inestable que el MovL anterior. Tambien en pruebas fuera de camara sucede que el jacobiano se demora en encontrar la velocidad ideal, llega a una posicion lejana y se acerca posteriormente al punto. 
+Observaciones: Aunque ambas trayectorias logran el objetivo, el método Jacobiano (MovLJc) presentó mayor inestabilidad transitoria frente al MovL. En pruebas adicionales, el Jacobiano demostró cierta latencia para estabilizar la velocidad ideal, tendiendo a alcanzar primero una posición aproximada para luego converger finamente al punto objetivo.
 
 ## 14.4 Precisión en el Seguimiento de Círculos (Circle-Following Accuracy)
 
-El manipulador fue comandado para dibujar un círculo en el plano tridimensional, definido por un punto inicial, un punto de paso y un punto final, evaluando el error de contorno. 
-El circulo a evaluar es: 
+Se comandó al manipulador para trazar una trayectoria circular en el plano 3D, evaluando el error de contorno. El círculo se definió por cuadrantes utilizando puntos de inicio, puntos de paso (vía) y puntos finales:
 Punto de inicio (0°): X=350, Y=-200
-Tramo 1 (0° a 120°): Pasa por 60° (Vía) y termina en 120° (Fin)
-Tramo 2 (120° a 240°): Pasa por 180° (Vía) y termina en 240° (Fin)
-Tramo 3 (240° a 360°): Pasa por 300° (Vía) y termina en 360° / 0° (Fin)
+Tramo 1 (0° a 120°): Vía en 60°, Fin en 120°.
+Tramo 2 (120° a 240°): Vía en 180°, Fin en 240°.
+Tramo 3 (240° a 360°): Vía en 300°, Fin en 360° (retorno a 0°).
 
 ### 14.4.1 Control en el Espacio Articular (Joint-Space Control)
-La trayectoria circular fue subdividida algorítmicamente en pequeños segmentos lineales/angulares resolviendo la cinemática inversa analítica en cada instante de muestreo. Se muestra el siguiente video de una trayectoria circular.  
-Los comandos usados configurados en el terminal que llaman a MovC son: 
+La trayectoria fue subdividida algorítmicamente en micro-segmentos, resolviendo la cinemática inversa analítica en cada instante de muestreo.
+
+https://drive.google.com/file/d/1CP7JKGHc-DlN9RPgjSa9mlf7zRySn_Zl/view?usp=sharing
+
+Los comandos usados son: 
+```text
 ** MJ 350.0 -200.0 8.0 30.0 -90
 ** MC 325.0 -156.7 8.0 275.0 -156.7 5.0 30.0 -90
 ** MC 250.0 -200.0 8.0 275.0 -243.3 5.0 30.0 -90
 ** MC 325.0 -243.3 8.0 350.0 -200.0 5.0 30.0 -90
+```
 
-https://drive.google.com/file/d/1CP7JKGHc-DlN9RPgjSa9mlf7zRySn_Zl/view?usp=sharing
 
 ### 14.4.2 Control Diferencial Jacobiano (Jacobian Differential Control)
-Las velocidades cartesianas tangenciales y normales del círculo fueron proyectadas directamente a los motores utilizando la matriz Jacobiana del manipulador. Se muestra el siguiente video de una trayectoria circular. 
-Los comandos usados configurados en el terminal que llaman a MovCJc son: 
+Las velocidades cartesianas (tangenciales y normales) del círculo se proyectaron directamente a los actuadores mediante la matriz Jacobiana del manipulador.
+
+https://drive.google.com/file/d/1z2fjtmh5Mo1P7OPMIwq1kOo_UF93UJF4/view?usp=sharing
+Los comandos usados son: 
+```text
 ** MJ 350.0 -200.0 8.0 30.0 -90
 ** MCJ 325.0 -156.7 8.0 275.0 -156.7 5.0 30.0 -90
 ** MCJ 250.0 -200.0 5.0 275.0 -243.3 5.0 30.0 -90 
 ** MCJ 325.0 -243.3 5.0 350.0 -200.0 5.0 30.0 -90
+```
 
-https://drive.google.com/file/d/1z2fjtmh5Mo1P7OPMIwq1kOo_UF93UJF4/view?usp=sharing
 
 ## 14.5 Validación de Pick-and-Place (Pick-and-Place Validation)
 
-Para probar la aplicabilidad del robot en tareas industriales estándar, se diseñó una rutina continua de manipulación de objetos utilizando un actuador electromagnético, midiendo la repetibilidad y el control de orientación de la herramienta.
+Para demostrar la viabilidad del robot en aplicaciones industriales estándar, se programaron rutinas continuas de manipulación de objetos utilizando un actuador electromagnético. El objetivo fue medir la repetibilidad posicional y el control de orientación de la herramienta.
 
 
 ### 14.5.1 Ejecución con Electroimán Vertical (Vertical Electromagnet Execution)
 Se realizaron dos ejercicios de pick and place
 ### 14.5.1.1 Pick and Place con Orientacion Fija
-Consta de mover dos motores ubicados en (300 0 0) y (300 -100 0) y desplazarlos a (200 -300 0) y (200 -320 0)  respectivamente manteniendo la herramienta con una orientacion vertical constante como se muestra en el siguiente video.
+Consiste en el traslado de dos elementos desde las posiciones de origen [300, 0, 0] y [300, -100, 0] hacia las coordenadas de destino [200, -300, 0] y [200, -340, 0]. Durante toda la trayectoria, el sistema restringe los movimientos para garantizar una orientación vertical constante del efector final.
 
 https://drive.google.com/file/d/14fL5Bf_gnQKGUnhLHYWuTvOm484aAfeh/view?usp=sharing
+
 Se usaron los siguientes comandos.  
+```text
+H
+MJ 300 0 50 30 -90
+MZ 12 30 -90
+E1
+MZ 100 50 -90
+ML 200 -300 100 100 -90
+MZ 12 30 -90
+E0
+MZ 100 50 -90
+MJ 300 -100 50 30 -90
+MZ 12 30 -90
+E1
+MZ 100 50 -90
+ML 200 -340 100 100 -90
+MZ 12 30 -90
+E0
+MZ 100 50 -90
+H
+```
 
 ### 14.5.1.1 Pick and Place sin restriccion de orientacion
-Consta de mover un troquel de la posicion (400 0 0) a la posicion (300 -300 0) sin restringir la orientacion de la muñeca, solo en la carga y descarga estan alineadas a -90° como se muestra en el siguiente video. 
+En esta variante, se traslada un troquel desde [400, 0, 0] hacia [300, -300, 0]. A diferencia del ejercicio anterior, la cinemática no restringe la orientación de la muñeca durante el viaje espacial; únicamente se garantiza el alineamiento estricto a -90° durante las fases críticas de agarre (carga) y liberación (descarga).
 
 https://drive.google.com/file/d/1_zEQAYb3ChMgH3YXYrcE96QIbQdVHNcD/view?usp=sharing
 
 Se usaron los siguientes comandos. 
-
+```text
+H
+MJ 400 0 100 100
+MZ 50 50 -90
+MZ 32 50 -90
+E1
+MZ 100 50 -90
+ML 300 -300 100 100
+MZ 50 50 -90
+MZ 32 50 -90
+E0
+MZ 100 50 -90
+H
+MJ 300 -300 100 100
+MZ 50 50 -90
+MZ 32 50 -90
+E1
+MZ 100 50 -90
+MLJ 400 0 100 100
+MZ 50 50 -90
+MZ 32 50 -90
+E0
+MZ 100 50 -90
+H
+```
