@@ -1362,6 +1362,9 @@ Se evaluó la capacidad del controlador PID en cascada para alcanzar y mantener 
 
 * *(Insertar aquí descripción de la respuesta: tiempo de asentamiento, sobreimpulso, y el error estático residual medio en grados).*
 * *(Añadir referencia a una gráfica de respuesta al escalón articular).*
+* 
+
+https://drive.google.com/file/d/1l5OTve27GERaM9chQBQAgsrRTndhh3gg/view?usp=sharing
 
 Al llegar a una posicion, se evidencia numericamente como llega a un valor casi exacto, apenas limitado por la tolerancia permitida de las cajas de 0.0081° de los JGY y de 0.0152 del motor 31ZX.
 <img width="408" height="210" alt="image" src="https://github.com/user-attachments/assets/124c4c81-5937-430d-89cb-3be643ef05ca" />
@@ -1371,11 +1374,11 @@ Al llegar a una posicion, se evidencia numericamente como llega a un valor casi 
 
 Esta prueba evaluó los movimientos de tipo Point-to-Point (PTP) utilizando interpolación articular pura con el comando MovJ. Se verificó que el sistema generara perfiles de velocidad suaves interpoladas sin saturar los actuadores, garantizando un desplazamiento fluido entre posiciones distantes del espacio de trabajo sin seguir una ruta cartesiana estricta como se muestra en el siguiente video.
 
-VIDEO MJ 
+https://drive.google.com/file/d/1bC-rdAKs7JnAJDkAYemPbMjBOrvM5eoC/view?usp=sharing
 
 TABLA
 
-[Imagen](https://github.com/labsir-un/Robotica-2026-I-Equipo-3E-Diaz-Pulido/tree/main/Proyecto%20Final%20Robotica)
+<img width="1600" height="1200" alt="WhatsApp Image 2026-07-28 at 11 07 58 PM" src="https://github.com/user-attachments/assets/97837a18-536a-4930-b54e-e88f4af1e271" />
 Cada cuadro tiene lados de 100mm  y se usaron comandos MJ para todos los puntos. 
 
 Se evidencia un desfase significativo en el eje X base de 15mm que aumenta progresivamente con la lejania del origen, el desfase en Y es menor aunque tiene un comportamiento similar. El resultado consta de poligonos que aumentan el angulo respecto a cuanto mas se alejan, lo que se explica por el error de Backlash de los motores usados que ronda entre 2 a 5° dependiendo del ajuste del prisionero. Sin embargo si se conservan las distancias entre puntos si se elimina ese desfase. Otro error importante es el de calibracion del cero inicial dado a que este añade desfase a los angulos y añade mayor deformacion a las trayectorias. 
@@ -1387,7 +1390,7 @@ Se programó el efector final para trazar una trayectoria rectilínea entre el p
 ### 14.3.1 Control en el Espacio Articular (Joint-Space Control)
 La línea fue discretizada en múltiples puntos (*via-points*) calculados con cinemática inversa estática. Entre cada punto, las articulaciones se movieron mediante interpolación articular como se muestra en el siguiente video.
 
-VIDEO ML
+https://drive.google.com/file/d/1IGybRSNwwlhfO0f9gVmJ1augvXSzRUta/view?usp=sharing
 
 Se usaron los comandos 
 ML 300 0 8 50 -90 , ML 300 -100 8 50 -90 , ML 300 -200 8 50 -90 y ML 300 -300 8 50 -90
@@ -1396,7 +1399,7 @@ Se evidencia que si bien intenta seguir la linea recta marcada por la regla y el
 ### 14.3.2 Control Diferencial Jacobiano (Jacobian Differential Control)
 Se ejecutó la misma recta implementando el método de la matriz Jacobiana. El vector de velocidad cartesiana se tradujo continuamente en velocidades articulares como se muestra en el video.
 
-VIDEO MLJ
+https://drive.google.com/file/d/1VYa0rV2wwYvCG0zg-fcDHO6ga-VXenTe/view?usp=sharing
 
 Se usaron los comandos 
 MLJ 300 0 8 50 -90 , MLJ 300 -100 8 50 -90 , MLJ 300 -200 8 50 -90 y MLJ 300 -300 8 50 -90 
@@ -1420,7 +1423,7 @@ Los comandos usados configurados en el terminal que llaman a MovC son:
 ** MC 250.0 -200.0 8.0 275.0 -243.3 5.0 30.0 -90
 ** MC 325.0 -243.3 8.0 350.0 -200.0 5.0 30.0 -90
 
-VIDEO C
+https://drive.google.com/file/d/1CP7JKGHc-DlN9RPgjSa9mlf7zRySn_Zl/view?usp=sharing
 
 ### 14.4.2 Control Diferencial Jacobiano (Jacobian Differential Control)
 Las velocidades cartesianas tangenciales y normales del círculo fueron proyectadas directamente a los motores utilizando la matriz Jacobiana del manipulador. Se muestra el siguiente video de una trayectoria circular. 
@@ -1430,23 +1433,25 @@ Los comandos usados configurados en el terminal que llaman a MovCJc son:
 ** MCJ 250.0 -200.0 5.0 275.0 -243.3 5.0 30.0 -90 
 ** MCJ 325.0 -243.3 5.0 350.0 -200.0 5.0 30.0 -90
 
-VIDEO CJ
+https://drive.google.com/file/d/1z2fjtmh5Mo1P7OPMIwq1kOo_UF93UJF4/view?usp=sharing
 
 ## 14.5 Validación de Pick-and-Place (Pick-and-Place Validation)
 
 Para probar la aplicabilidad del robot en tareas industriales estándar, se diseñó una rutina continua de manipulación de objetos utilizando un actuador electromagnético, midiendo la repetibilidad y el control de orientación de la herramienta.
 
-(*Pitch* constante, $\Phi$)
 
 ### 14.5.1 Ejecución con Electroimán Vertical (Vertical Electromagnet Execution)
 Se realizaron dos ejercicios de pick and place
 ### 14.5.1.1 Pick and Place con Orientacion Fija
 Consta de mover dos motores ubicados en (300 0 0) y (300 -100 0) y desplazarlos a (200 -300 0) y (200 -320 0)  respectivamente manteniendo la herramienta con una orientacion vertical constante como se muestra en el siguiente video.
 
+https://drive.google.com/file/d/14fL5Bf_gnQKGUnhLHYWuTvOm484aAfeh/view?usp=sharing
 Se usaron los siguientes comandos.  
 
 ### 14.5.1.1 Pick and Place sin restriccion de orientacion
 Consta de mover un troquel de la posicion (400 0 0) a la posicion (300 -300 0) sin restringir la orientacion de la muñeca, solo en la carga y descarga estan alineadas a -90° como se muestra en el siguiente video. 
+
+https://drive.google.com/file/d/1_zEQAYb3ChMgH3YXYrcE96QIbQdVHNcD/view?usp=sharing
 
 Se usaron los siguientes comandos. 
 
