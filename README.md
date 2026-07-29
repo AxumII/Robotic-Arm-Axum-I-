@@ -1295,20 +1295,20 @@ Tramo 3 (240° a 360°): Pasa por 300° (Vía) y termina en 360° / 0° (Fin)
 ### 14.4.1 Control en el Espacio Articular (Joint-Space Control)
 La trayectoria circular fue subdividida algorítmicamente en pequeños segmentos lineales/angulares resolviendo la cinemática inversa analítica en cada instante de muestreo. Se muestra el siguiente video de una trayectoria circular.  
 Los comandos usados configurados en el terminal que llaman a MovC son: 
-ML 350.0 -200.0 5.0 30.0
-MC 325.0 -156.7 5.0 275.0 -156.7 5.0 30.0
-MC 250.0 -200.0 5.0 275.0 -243.3 5.0 30.0
-MC 325.0 -243.3 5.0 350.0 -200.0 5.0 30.0
+** ML 350.0 -200.0 5.0 30.0
+** MC 325.0 -156.7 5.0 275.0 -156.7 5.0 30.0
+** MC 250.0 -200.0 5.0 275.0 -243.3 5.0 30.0
+** MC 325.0 -243.3 5.0 350.0 -200.0 5.0 30.0
 
 VIDEO C
 
 ### 14.4.2 Control Diferencial Jacobiano (Jacobian Differential Control)
 Las velocidades cartesianas tangenciales y normales del círculo fueron proyectadas directamente a los motores utilizando la matriz Jacobiana del manipulador. Se muestra el siguiente video de una trayectoria circular. 
 Los comandos usados configurados en el terminal que llaman a MovCJc son: 
-MJ 350.0 -200.0 5.0 30.0
-MCJ 325.0 -156.7 5.0 275.0 -156.7 5.0 30.0
-MCJ 250.0 -200.0 5.0 275.0 -243.3 5.0 30.0
-MCJ 325.0 -243.3 5.0 350.0 -200.0 5.0 30.0
+** MJ 350.0 -200.0 5.0 30.0
+** MCJ 325.0 -156.7 5.0 275.0 -156.7 5.0 30.0
+** MCJ 250.0 -200.0 5.0 275.0 -243.3 5.0 30.0
+** MCJ 325.0 -243.3 5.0 350.0 -200.0 5.0 30.0
 
 VIDEO CJ
 
