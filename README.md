@@ -1248,45 +1248,79 @@ Se evaluó la capacidad del controlador PID en cascada para alcanzar y mantener 
 * *(Insertar aquí descripción de la respuesta: tiempo de asentamiento, sobreimpulso, y el error estático residual medio en grados).*
 * *(Añadir referencia a una gráfica de respuesta al escalón articular).*
 
+Al llegar a una posicion, se evidencia numericamente como llega a un valor casi exacto, apenas limitado por la tolerancia permitida de las cajas de 0.0081° de los JGY y de 0.0152 del motor 31ZX.
+<img width="408" height="210" alt="image" src="https://github.com/user-attachments/assets/124c4c81-5937-430d-89cb-3be643ef05ca" />
+
+
 ## 14.2 Trayectoria de Movimiento en el Espacio Libre (Free-Space Motion Trajectory)
 
-Esta prueba evaluó los movimientos de tipo Point-to-Point (PTP) utilizando interpolación articular pura (movimientos asíncronos u homólogos). Se verificó que el sistema generara perfiles de velocidad suaves (trapezoidales o curva-S) sin saturar los actuadores, garantizando un desplazamiento fluido entre posiciones distantes del espacio de trabajo sin seguir una ruta cartesiana estricta.
+Esta prueba evaluó los movimientos de tipo Point-to-Point (PTP) utilizando interpolación articular pura con el comando MovJ. Se verificó que el sistema generara perfiles de velocidad suaves interpoladas sin saturar los actuadores, garantizando un desplazamiento fluido entre posiciones distantes del espacio de trabajo sin seguir una ruta cartesiana estricta como se muestra en el siguiente video.
 
-* *(Insertar observaciones empíricas sobre la fluidez del movimiento y la sincronización de las articulaciones para llegar al mismo tiempo al objetivo).*
+VIDEO MJ 
+
+TABLA
+
+[Imagen](https://github.com/labsir-un/Robotica-2026-I-Equipo-3E-Diaz-Pulido/tree/main/Proyecto%20Final%20Robotica)
+Cada cuadro tiene lados de 100mm 
+
+Se evidencia un desfase significativo en el eje X base de 15mm que aumenta progresivamente con la lejania del origen, el desfase en Y es menor aunque tiene un comportamiento similar. El resultado consta de poligonos que aumentan el angulo respecto a cuanto mas se alejan, lo que se explica por el error de Backlash de los motores usados que ronda entre 2 a 5° dependiendo del ajuste del prisionero. Sin embargo si se conservan las distancias entre puntos si se elimina ese desfase. Otro error importante es el de calibracion del cero inicial dado a que este añade desfase a los angulos y añade mayor deformacion a las trayectorias. 
 
 ## 14.3 Precisión en el Seguimiento de Línea (Line-Following Accuracy)
 
-Se programó el efector final para trazar una trayectoria rectilínea entre un punto $A$ y un punto $B$ en el espacio tridimensional. El objetivo es evaluar la desviación cartesiana del efector respecto a la línea ideal.
+Se programó el efector final para trazar una trayectoria rectilínea entre el punto (300 0 5) y el punto (300 -300 5) en el espacio tridimensional. El objetivo es evaluar la desviación cartesiana del efector respecto a la línea ideal. Se trazo una linea respecto a los dos puntos y se compararon los dos controladores. 
 
 ### 14.3.1 Control en el Espacio Articular (Joint-Space Control)
-La línea fue discretizada en múltiples puntos (*via-points*) calculados con cinemática inversa estática. Entre cada punto, las articulaciones se movieron mediante interpolación articular.
-* *(Describir observaciones: ej. vibraciones introducidas por la discretización o variaciones en la velocidad tangencial).*
+La línea fue discretizada en múltiples puntos (*via-points*) calculados con cinemática inversa estática. Entre cada punto, las articulaciones se movieron mediante interpolación articular como se muestra en el siguiente video.
+
+VIDEO ML
+
+Se evidencia que si bien intenta seguir la linea recta marcada por la regla y el error no es tan significativo , el backlash de los motores es importante y afecta la medicion. 
 
 ### 14.3.2 Control Diferencial Jacobiano (Jacobian Differential Control)
-Se ejecutó la misma recta implementando el método de la matriz Jacobiana pseudo-inversa amortiguada (DLS). El vector de velocidad cartesiana se tradujo continuamente en velocidades articulares.
-* *(Describir observaciones: ej. mayor fluidez en la trayectoria, constancia en la velocidad lineal, manejo de proximidad a singularidades).*
+Se ejecutó la misma recta implementando el método de la matriz Jacobiana. El vector de velocidad cartesiana se tradujo continuamente en velocidades articulares como se muestra en el video.
 
-### 14.3.3 Análisis de Error y Comparación (Error Analysis & Comparison)
-* *(Insertar tabla o métricas comparativas: Error Cuadrático Medio (RMSE) y Desviación Máxima Absoluta para ambos métodos).* 
-* **Conclusión de la prueba:** El control diferencial demostró ser [más/menos] preciso y [más/menos] estable computacionalmente que el control discreto articular para tareas de desplazamiento lineal cartesiano.
+VIDEO MLJ
+
+Se evidencia que ambas lineas son similares, aunque el seguimiento del jacobiano MovLJc es mucho mas inestable que el MovL anterior. Tambien en pruebas fuera de camara sucede que el jacobiano se demora en encontrar la velocidad ideal, llega a una posicion lejana y se acerca posteriormente al punto. 
 
 ## 14.4 Precisión en el Seguimiento de Círculos (Circle-Following Accuracy)
 
-El manipulador fue comandado para dibujar un círculo en el plano tridimensional, definido por un punto inicial, un punto de paso (*via-point*) y un punto final, evaluando el error de contorno.
+El manipulador fue comandado para dibujar un círculo en el plano tridimensional, definido por un punto inicial, un punto de paso y un punto final, evaluando el error de contorno. 
+El circulo a evaluar es: 
+Punto de inicio (0°): X=350, Y=-200
+Tramo 1 (0° a 120°): Pasa por 60° (Vía) y termina en 120° (Fin)
+Tramo 2 (120° a 240°): Pasa por 180° (Vía) y termina en 240° (Fin)
+Tramo 3 (240° a 360°): Pasa por 300° (Vía) y termina en 360° / 0° (Fin)
 
 ### 14.4.1 Control en el Espacio Articular (Joint-Space Control)
-La trayectoria circular fue subdividida algorítmicamente en pequeños segmentos lineales/angulares resolviendo la cinemática inversa analítica en cada instante de muestreo.
+La trayectoria circular fue subdividida algorítmicamente en pequeños segmentos lineales/angulares resolviendo la cinemática inversa analítica en cada instante de muestreo. Se muestra el siguiente video de una trayectoria circular.  
+Los comandos usados configurados en el terminal que llaman a MovC son: 
+ML 350.0 -200.0 5.0 30.0
+MC 325.0 -156.7 5.0 275.0 -156.7 5.0 30.0
+MC 250.0 -200.0 5.0 275.0 -243.3 5.0 30.0
+MC 325.0 -243.3 5.0 350.0 -200.0 5.0 30.0
+
+VIDEO C
 
 ### 14.4.2 Control Diferencial Jacobiano (Jacobian Differential Control)
-Las velocidades cartesianas tangenciales y normales del círculo fueron proyectadas directamente a los motores utilizando la matriz Jacobiana del manipulador. 
+Las velocidades cartesianas tangenciales y normales del círculo fueron proyectadas directamente a los motores utilizando la matriz Jacobiana del manipulador. Se muestra el siguiente video de una trayectoria circular. 
+Los comandos usados configurados en el terminal que llaman a MovCJc son: 
+MJ 350.0 -200.0 5.0 30.0
+MCJ 325.0 -156.7 5.0 275.0 -156.7 5.0 30.0
+MCJ 250.0 -200.0 5.0 275.0 -243.3 5.0 30.0
+MCJ 325.0 -243.3 5.0 350.0 -200.0 5.0 30.0
 
-### 14.4.3 Análisis de Error y Comparación (Error Analysis & Comparison)
-* *(Insertar aquí las métricas de desviación radial y deformación geométrica, así como la gráfica comparativa del círculo ideal vs. el círculo real trazado).*
-* **Conclusión de la prueba:** Se evidenció que el control Jacobiano reduce la deformación de la trayectoria circular (el efecto de "polígono") en comparación con la interpolación de puntos en el espacio articular, logrando un mejor desempeño especialmente a velocidades elevadas.
+VIDEO CJ
 
 ## 14.5 Validación de Pick-and-Place (Pick-and-Place Validation)
 
 Para probar la aplicabilidad del robot en tareas industriales estándar, se diseñó una rutina continua de manipulación de objetos utilizando un actuador electromagnético, midiendo la repetibilidad y el control de orientación de la herramienta.
 
 ### 14.5.1 Ejecución con Electroimán Vertical (Vertical Electromagnet Execution)
-Se requirió que el robot tomara una pieza de una pared vertical y la depositara en otra superficie ortogonal. Para ello, se activó el modo "Muñeca Forzada" (3 DOF), forzando una restricción de cabeceo (*Pitch* constante, $\Phi$). La prueba demostró que el controlador cinemático logró mantener la orientación del efector estricta durante toda la traslación cartesiana, evitando la caída de la pieza magnética y asegurando una aproximación precisa a la superficie objetivo.
+Se requirió que el robot tomara un motor en una posicion dada, gira la muñeca, mueve a un punto elegido y la deposita en otra posicion . Para ello, se activó el modo "Muñeca Forzada" (3 DOF), forzando una restricción de cabeceo (*Pitch* constante, $\Phi$). Ademas de otra prueba donde transporte un motor sosteniendo el angulo de cabeceo constante en toda la trayectoria como se muestran en los siguientes videos. 
+
+Video 1
+
+Video 2
+
+La prueba demostró que el controlador cinemático logró mantener la orientación del efector estricta durante toda la traslación cartesiana, evitando la caída de la pieza magnética y asegurando una aproximación precisa a la superficie objetivo.
