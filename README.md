@@ -1240,6 +1240,121 @@ Las posiciones X e Y se heredan de `_kinematic->angle2Pos(sensor_q)` [cite: 1].
 # 14. Evaluación de Rendimiento y Pruebas Experimentales (Performance Evaluation & Experimental Tests)
 
 Para validar el desempeño del diseño de control y las formulaciones cinemáticas implementadas, se llevaron a cabo diversas pruebas experimentales. Se analizó la precisión de posicionamiento y el comportamiento dinámico del robot bajo distintas estrategias de control y perfiles de trayectoria.
+Para la facilidad de uso de comandos se creo en la interfaz de comandos por puerto serial (UART) implementada en el `MenuManager`. El sistema utiliza un formato de comandos cortos basados en acrónimos para agilizar su escritura en la terminal, manteniendo la flexibilidad de incluir múltiples parámetros espaciados o separados por comas según el contexto. Todo esta basado en los metodos de ControlManager en el manual de instrucciones. 
+
+---
+
+## 1. Comandos de Sistema, Debug y Seguridad
+
+Comandos globales para la detención, telemetría y diagnóstico del sistema.
+
+| Comando | Descripción | Ejemplo |
+|:---:|---|---|
+| **`S`** | **Parada de Emergencia (Stop).** Detiene inmediatamente todos los motores (PWM a 0) y guarda la posición actual por seguridad. | `S` |
+| **`P`** | **Pausar/Reanudar Telemetría.** Alterna (Toggle) la impresión automática de telemetría (ángulos, velocidad, corriente) que ocurre cada 500ms. | `P` |
+| **`D`** | **Modo Debug Analógico.** Imprime la medición de corriente cruda de los 4 canales para revisión de sensores. | `D` |
+
+---
+
+## 2. Hardware Adicional y Periféricos
+
+Gestión de actuadores, relés y offsets de los sensores del robot.
+
+| Comando | Descripción | Ejemplo |
+|:---:|---|---|
+| **`E1` / `EH`** | Activa (HIGH) el pin del Elevador o Relé principal. | `E1` |
+| **`E0` / `ED`** | Desactiva (LOW) el pin del Elevador o Relé principal. | `ED` |
+| **`Z<id>`** | Establece el Cero (Offset) del encoder para el motor indicado. *<id>* de `1` a `4`. | `Z1` (Setea cero en M1) |
+| **`R<id><estado>`**| Controla un pin en el expansor I2C (Relés secundarios). *<id>* `1` a `4`, *<estado>* `1` (ON) o `0` (OFF). | `R21` (Enciende relay 2) |
+
+---
+
+## 3. Control Manual de Motores (Directo por PWM)
+
+Movimientos directos a nivel de articulación (open-loop) por PWM.
+* **<id>**: Número de motor (`1` a `4`)
+* **<dir>**: Dirección del giro: `H` (Horario), `A` (Antihorario), `S` (Stop)
+* **<pwm>**: Valor del ciclo de trabajo de PWM (ej. `120.5`)
+* **<ms>**: Milisegundos que durará el movimiento.
+
+###  Modo Temporizado (`T`)
+El comando de estructura **`T<id><dir><pwm>,<ms>`** (o *txAxx,xxx* como referencia) permite ejecutar un motor a un PWM específico por un tiempo determinado, deteniéndose solo al terminar.
+* **Ejemplo:** `T1A150,1000` 
+  *(Ejecuta el Motor 1, Antihorario, con 150 de PWM durante 1000 milisegundos).*
+* **Ejemplo:** `T2H80,500` 
+  *(Ejecuta el Motor 2, Horario, con 80 de PWM durante 500 milisegundos).*
+
+###  Modo Continuo
+Formato **`<id><dir><pwm>`**
+* **Ejemplo:** `1H100` *(Motor 1, Horario, PWM 100)*
+* **Ejemplo:** `3A50` *(Motor 3, Antihorario, PWM 50)*
+* **Ejemplo:** `1S` *(Detiene el Motor 1)*
+
+---
+
+##  4. Movimientos Cinemáticos Espaciales
+
+Comandos para generar trayectorias a través de la Cinemática Inversa (IK) o el método Jacobiano DLS (Damped Least Squares). 
+
+**Parámetros base:**
+* **`x, y, z`**: Coordenadas espaciales (milímetros o metros, dependiendo de la config).
+* **`v`**: Velocidad del movimiento.
+* **`phi`** *(Opcional)*: Ángulo de cabeceo/pitch del efector final (en grados).
+
+###  Movimientos Lineales (Línea Recta)
+* **`MLJ <x> <y> <z> <v> [phi]`**: Trayectoria lineal mediante Jacobiano (DLS).
+* **`ML <x> <y> <z> <v> [phi]`**: Trayectoria lineal mediante Cinemática Inversa Clásica (IK).
+  * *Ejemplo:* `ML 100 0 50 20` o `MLJ 100 0 50 20 -45`
+
+###  Movimientos a Punto Articular / Espacial
+* **`MJ <x> <y> <z> <v> [phi]`**: Movimiento Joint-space (no garantiza línea recta en el trayecto, sino interpolación articular pura) hacia una coordenada cartesiana.
+
+###  Movimientos Circulares (`MC` y `MCJ`)
+Requiere un punto intermedio (vía) y un punto final para calcular el arco tridimensional.
+* **`MC <x1> <y1> <z1> <x2> <y2> <z2> <v> [phi]`**: Circular basado en IK.
+* **`MCJ <x1> <y1> <z1> <x2> <y2> <z2> <v> [phi]`**: Circular basado en DLS.
+  * *Ejemplo:* `MC 50 50 20 100 0 20 15 0` (Pasa por `50,50,20`, termina en `100,0,20` a velocidad `15`).
+
+###  Movimiento Articular Puro (`MA`)
+Controla el ángulo exacto de cada motor.
+* **`MA <q1> <q2> <q3> <q4> <v>`**: Ángulos en **grados** y velocidad.
+  * *Ejemplo:* `MA 45 -45 90 0 30` (Lleva las articulaciones a esos grados a 30°/s).
+
+###  Movimientos en el Eje Z (Elevación)
+* **`MZJ <z> <v> [phi]`**: Desplazamiento exclusivo en Z manteniendo X/Y (por DLS).
+* **`MZ <z> <v> [phi]`**: Desplazamiento exclusivo en Z (por IK).
+
+---
+
+##  5. Posiciones de Origen (Home)
+
+Comandos para devolver el robot a posiciones seguras conocidas. Velocidad por defecto: `30.0 °/s`.
+
+* **`H`** o **`HOM [v]`**: Va a la posición Home estándar (Q = {90°, -90°, 90°, -90°}).
+  * *Ejemplo:* `H` o `HOM 15`
+* **`HZ`** o **`HOMZ [v]`**: Va a la posición Home Cero (Q = {0°, 0°, 0°, 0°}).
+
+---
+
+##  6. Sintonización (Tuning) y Datalogger (Osciloscopio)
+
+Herramientas avanzadas para ajuste de lazos de control PID y análisis dinámico de la planta.
+
+| Comando | Descripción |
+|:---|---|
+| **`TUNE`** | Inicia la secuencia de **AutoTune**. *Pauses automáticamente la telemetría para evitar colisiones en la UART.* |
+| **`GETGAINS`** | Imprime las ganancias de control actuales de todos los motores en consola. |
+| **`SETGAIN <id> <kp> <ki> <f_up> <f_down>`** | Actualiza manualmente las ganancias PID y de Fricción (Feedforward) de un motor. <br>*Ejemplo:* `SETGAIN 1 2.5 0.1 1.2 1.0` |
+
+###  Datalogger Dinámico (`LOG`)
+Registra datos a **100 Hz (cada 10ms)** para graficarlos externamente (ej. en Excel, MATLAB o Python). Al activarse, la telemetría normal se apaga temporalmente.
+* **Sintaxis:** `LOG <tipo> <tiempo_ms>`
+  * **Tipos:** 
+    * `1` = Posición Angular (grados)
+    * `2` = Velocidad (rad/s)
+    * `3` = Corriente/Esfuerzo (Amperios)
+* **Ejemplo:** `LOG 1 5000` *(Captura las posiciones angulares durante 5 segundos y las imprime en formato CSV listo para copiar).*
+
 
 ## 14.1 Rendimiento de Posicionamiento Angular (Angular Positioning Performance)
 
@@ -1261,7 +1376,7 @@ VIDEO MJ
 TABLA
 
 [Imagen](https://github.com/labsir-un/Robotica-2026-I-Equipo-3E-Diaz-Pulido/tree/main/Proyecto%20Final%20Robotica)
-Cada cuadro tiene lados de 100mm 
+Cada cuadro tiene lados de 100mm  y se usaron comandos MJ para todos los puntos. 
 
 Se evidencia un desfase significativo en el eje X base de 15mm que aumenta progresivamente con la lejania del origen, el desfase en Y es menor aunque tiene un comportamiento similar. El resultado consta de poligonos que aumentan el angulo respecto a cuanto mas se alejan, lo que se explica por el error de Backlash de los motores usados que ronda entre 2 a 5° dependiendo del ajuste del prisionero. Sin embargo si se conservan las distancias entre puntos si se elimina ese desfase. Otro error importante es el de calibracion del cero inicial dado a que este añade desfase a los angulos y añade mayor deformacion a las trayectorias. 
 
@@ -1274,12 +1389,17 @@ La línea fue discretizada en múltiples puntos (*via-points*) calculados con ci
 
 VIDEO ML
 
+Se usaron los comandos 
+ML 300 0 8 50 -90 , ML 300 -100 8 50 -90 , ML 300 -200 8 50 -90 y ML 300 -300 8 50 -90
 Se evidencia que si bien intenta seguir la linea recta marcada por la regla y el error no es tan significativo , el backlash de los motores es importante y afecta la medicion. 
 
 ### 14.3.2 Control Diferencial Jacobiano (Jacobian Differential Control)
 Se ejecutó la misma recta implementando el método de la matriz Jacobiana. El vector de velocidad cartesiana se tradujo continuamente en velocidades articulares como se muestra en el video.
 
 VIDEO MLJ
+
+Se usaron los comandos 
+MLJ 300 0 8 50 -90 , MLJ 300 -100 8 50 -90 , MLJ 300 -200 8 50 -90 y MLJ 300 -300 8 50 -90 
 
 Se evidencia que ambas lineas son similares, aunque el seguimiento del jacobiano MovLJc es mucho mas inestable que el MovL anterior. Tambien en pruebas fuera de camara sucede que el jacobiano se demora en encontrar la velocidad ideal, llega a una posicion lejana y se acerca posteriormente al punto. 
 
@@ -1295,20 +1415,20 @@ Tramo 3 (240° a 360°): Pasa por 300° (Vía) y termina en 360° / 0° (Fin)
 ### 14.4.1 Control en el Espacio Articular (Joint-Space Control)
 La trayectoria circular fue subdividida algorítmicamente en pequeños segmentos lineales/angulares resolviendo la cinemática inversa analítica en cada instante de muestreo. Se muestra el siguiente video de una trayectoria circular.  
 Los comandos usados configurados en el terminal que llaman a MovC son: 
-** ML 350.0 -200.0 5.0 30.0
-** MC 325.0 -156.7 5.0 275.0 -156.7 5.0 30.0
-** MC 250.0 -200.0 5.0 275.0 -243.3 5.0 30.0
-** MC 325.0 -243.3 5.0 350.0 -200.0 5.0 30.0
+** MJ 350.0 -200.0 8.0 30.0 -90
+** MC 325.0 -156.7 8.0 275.0 -156.7 5.0 30.0 -90
+** MC 250.0 -200.0 8.0 275.0 -243.3 5.0 30.0 -90
+** MC 325.0 -243.3 8.0 350.0 -200.0 5.0 30.0 -90
 
 VIDEO C
 
 ### 14.4.2 Control Diferencial Jacobiano (Jacobian Differential Control)
 Las velocidades cartesianas tangenciales y normales del círculo fueron proyectadas directamente a los motores utilizando la matriz Jacobiana del manipulador. Se muestra el siguiente video de una trayectoria circular. 
 Los comandos usados configurados en el terminal que llaman a MovCJc son: 
-** MJ 350.0 -200.0 5.0 30.0
-** MCJ 325.0 -156.7 5.0 275.0 -156.7 5.0 30.0
-** MCJ 250.0 -200.0 5.0 275.0 -243.3 5.0 30.0
-** MCJ 325.0 -243.3 5.0 350.0 -200.0 5.0 30.0
+** MJ 350.0 -200.0 8.0 30.0 -90
+** MCJ 325.0 -156.7 8.0 275.0 -156.7 5.0 30.0 -90
+** MCJ 250.0 -200.0 5.0 275.0 -243.3 5.0 30.0 -90 
+** MCJ 325.0 -243.3 5.0 350.0 -200.0 5.0 30.0 -90
 
 VIDEO CJ
 
@@ -1316,11 +1436,17 @@ VIDEO CJ
 
 Para probar la aplicabilidad del robot en tareas industriales estándar, se diseñó una rutina continua de manipulación de objetos utilizando un actuador electromagnético, midiendo la repetibilidad y el control de orientación de la herramienta.
 
+(*Pitch* constante, $\Phi$)
+
 ### 14.5.1 Ejecución con Electroimán Vertical (Vertical Electromagnet Execution)
-Se requirió que el robot tomara un motor en una posicion dada, gira la muñeca, mueve a un punto elegido y la deposita en otra posicion . Para ello, se activó el modo "Muñeca Forzada" (3 DOF), forzando una restricción de cabeceo (*Pitch* constante, $\Phi$). Ademas de otra prueba donde transporte un motor sosteniendo el angulo de cabeceo constante en toda la trayectoria como se muestran en los siguientes videos. 
+Se realizaron dos ejercicios de pick and place
+### 14.5.1.1 Pick and Place con Orientacion Fija
+Consta de mover dos motores ubicados en (300 0 0) y (300 -100 0) y desplazarlos a (200 -300 0) y (200 -320 0)  respectivamente manteniendo la herramienta con una orientacion vertical constante como se muestra en el siguiente video.
 
-Video 1
+Se usaron los siguientes comandos.  
 
-Video 2
+### 14.5.1.1 Pick and Place sin restriccion de orientacion
+Consta de mover un troquel de la posicion (400 0 0) a la posicion (300 -300 0) sin restringir la orientacion de la muñeca, solo en la carga y descarga estan alineadas a -90° como se muestra en el siguiente video. 
 
-La prueba demostró que el controlador cinemático logró mantener la orientación del efector estricta durante toda la traslación cartesiana, evitando la caída de la pieza magnética y asegurando una aproximación precisa a la superficie objetivo.
+Se usaron los siguientes comandos. 
+
